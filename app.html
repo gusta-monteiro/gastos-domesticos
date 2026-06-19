@@ -1,313 +1,292 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gastos Domésticos</title>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap"
-      rel="stylesheet"
-    />
-    <link
-      href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="assets/css/main.css" />
-  </head>
-  <body>
-    <div class="shell">
-      <!-- Sidebar -->
-      <aside class="sidebar">
-        <div class="sidebar-logo">
-          <h1>Finanças</h1>
-          <p>Gestão doméstica</p>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gastos Domésticos</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/main.css">
+</head>
+<body>
+<div class="shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <h1>Finanças</h1>
+      <p>Gestão doméstica</p>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" data-page="calc"><i class="ti ti-calculator"></i> Calculadora</div>
+      <div class="nav-item" data-page="period"><i class="ti ti-chart-line"></i> Por período</div>
+      <div class="nav-item" data-page="report"><i class="ti ti-file-text"></i> Relatório</div>
+      <div class="nav-item" data-page="invest"><i class="ti ti-trending-up"></i> Investimentos</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="nav-item" data-page="profile"><i class="ti ti-user-circle"></i> <span id="sidebar-username">Perfil</span></div>
+    </div>
+  </aside>
+
+  <div class="content">
+
+    <!-- Topbar -->
+    <div class="topbar">
+      <div class="topbar-left">
+        <span class="page-title" id="page-title">Calculadora</span>
+        <div class="month-nav" id="month-nav">
+          <button id="prev-month" aria-label="Mês anterior"><i class="ti ti-chevron-left"></i></button>
+          <span class="month-label" id="month-label"></span>
+          <button id="next-month" aria-label="Próximo mês"><i class="ti ti-chevron-right"></i></button>
         </div>
-        <nav class="sidebar-nav">
-          <div class="nav-item active" data-page="calc">
-            <i class="ti ti-calculator"></i> Calculadora
-          </div>
-          <div class="nav-item" data-page="period">
-            <i class="ti ti-chart-line"></i> Por período
-          </div>
-          <div class="nav-item" data-page="report">
-            <i class="ti ti-file-text"></i> Relatório
-          </div>
-          <div class="nav-item" data-page="invest">
-            <i class="ti ti-trending-up"></i> Investimentos
-          </div>
-        </nav>
-      </aside>
+      </div>
+      <div class="renda-wrap">
+        <label>Renda</label>
+        <span class="renda-prefix">R$</span>
+        <input type="number" id="renda" placeholder="0" min="0" step="100">
+      </div>
+    </div>
 
-      <div class="content">
-        <!-- Topbar -->
-        <div class="topbar">
-          <div class="topbar-left">
-            <span class="page-title" id="page-title">Calculadora</span>
-            <div class="month-nav" id="month-nav">
-              <button id="prev-month" aria-label="Mês anterior">
-                <i class="ti ti-chevron-left"></i>
-              </button>
-              <span class="month-label" id="month-label"></span>
-              <button id="next-month" aria-label="Próximo mês">
-                <i class="ti ti-chevron-right"></i>
-              </button>
-            </div>
+    <!-- Calculadora -->
+    <div class="page active" id="page-calc">
+      <div class="metric-grid" id="metric-grid"></div>
+      <div class="calc-grid">
+        <div class="card">
+          <div class="card-header">
+            <span>Categorias</span>
+            <span id="pct-total-lbl" style="font-size:11px"></span>
           </div>
-          <div class="renda-wrap">
-            <label>Renda</label>
-            <span class="renda-prefix">R$</span>
-            <input
-              type="number"
-              id="renda"
-              placeholder="0"
-              min="0"
-              step="100"
-            />
-          </div>
+          <div id="pct-warning" style="display:none"></div>
+          <div id="categories"></div>
         </div>
-
-        <!-- Calculadora -->
-        <div class="page active" id="page-calc">
-          <div class="metric-grid" id="metric-grid"></div>
-          <div class="calc-grid">
-            <div class="card">
-              <div class="card-header">
-                <span>Categorias</span>
-                <span id="pct-total-lbl" style="font-size: 11px"></span>
-              </div>
-              <div id="pct-warning" style="display: none"></div>
-              <div id="categories"></div>
-            </div>
-            <div class="card">
-              <div class="card-header"><span>Distribuição</span></div>
-              <div class="chart-panel">
-                <div class="chart-wrap">
-                  <canvas
-                    id="pieChart"
-                    role="img"
-                    aria-label="Gráfico de distribuição dos gastos por categoria"
-                    width="200"
-                    height="200"
-                  ></canvas>
-                  <div class="chart-center">
-                    <div class="chart-center-lbl">Total</div>
-                    <div class="chart-center-val" id="chart-center-val">
-                      R$ 0
-                    </div>
-                  </div>
-                </div>
-                <div class="legend" id="legend"></div>
+        <div class="card">
+          <div class="card-header"><span>Distribuição</span></div>
+          <div class="chart-panel">
+            <div class="chart-wrap">
+              <canvas id="pieChart" role="img" aria-label="Gráfico de distribuição dos gastos por categoria" width="200" height="200"></canvas>
+              <div class="chart-center">
+                <div class="chart-center-lbl">Total</div>
+                <div class="chart-center-val" id="chart-center-val">R$ 0</div>
               </div>
             </div>
-          </div>
-        </div>
-
-        <!-- Por período -->
-        <div class="page" id="page-period">
-          <div class="period-controls">
-            <label>Período</label>
-            <select id="period-select">
-              <option value="3">Últimos 3 meses</option>
-              <option value="6" selected>Últimos 6 meses</option>
-              <option value="12">Últimos 12 meses</option>
-            </select>
-          </div>
-          <div class="metric-grid" id="period-metrics"></div>
-          <div class="period-grid">
-            <div class="card">
-              <div class="card-header"><span>Renda vs. gastos</span></div>
-              <div style="padding: 1.25rem">
-                <div class="period-chart-wrap">
-                  <canvas
-                    id="barChart"
-                    role="img"
-                    aria-label="Gráfico comparativo de renda e gastos por mês"
-                  ></canvas>
-                </div>
-              </div>
-            </div>
-            <div class="card">
-              <div class="card-header">
-                <span>Composição por categoria</span>
-              </div>
-              <div style="padding: 1.25rem">
-                <div class="period-chart-wrap">
-                  <canvas
-                    id="stackChart"
-                    role="img"
-                    aria-label="Gráfico de composição de gastos por categoria ao longo dos meses"
-                  ></canvas>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Relatório -->
-        <div class="page" id="page-report">
-          <div class="report-controls">
-            <label
-              style="
-                font-size: 11px;
-                text-transform: uppercase;
-                letter-spacing: 0.06em;
-                color: var(--text3);
-              "
-              >Período</label
-            >
-            <select id="report-period">
-              <option value="3">Últimos 3 meses</option>
-              <option value="6" selected>Últimos 6 meses</option>
-              <option value="12">Últimos 12 meses</option>
-            </select>
-            <button class="btn" onclick="window.print()">
-              <i class="ti ti-printer"></i> Imprimir
-            </button>
-          </div>
-
-          <div class="report-card" id="report-content"></div>
-
-          <div class="report-card">
-            <div class="ai-label">
-              <i class="ti ti-chart-dots"></i> Parecer do período
-            </div>
-            <div class="ai-box" id="ai-output">
-              Selecione um período para visualizar o parecer.
-            </div>
-          </div>
-        </div>
-
-        <!-- Investimentos -->
-        <div class="page" id="page-invest">
-          <!-- Cards de aporte do mês atual -->
-          <div
-            class="metric-grid"
-            id="invest-metrics"
-            style="margin-bottom: 1.5rem"
-          ></div>
-
-          <div
-            style="display: grid; grid-template-columns: 1fr 300px; gap: 1.5rem"
-          >
-            <!-- Coluna esquerda -->
-            <div style="display: flex; flex-direction: column; gap: 1.5rem">
-              <!-- Aportes do mês: lançados na calculadora -->
-              <div class="card">
-                <div class="card-header">
-                  <span>Aporte do mês — <span id="inv-month-lbl"></span></span>
-                </div>
-                <div
-                  id="inv-aporte-rows"
-                  style="
-                    padding: 1.25rem;
-                    display: flex;
-                    flex-direction: column;
-                    gap: 10px;
-                  "
-                ></div>
-              </div>
-
-              <!-- Composição da carteira (classes de ativo) -->
-              <div class="card">
-                <div class="card-header">
-                  <span>Composição da carteira</span>
-                  <span id="inv-pct-lbl" style="font-size: 11px"></span>
-                </div>
-                <div id="inv-pct-warning" style="display: none"></div>
-                <div id="inv-classes"></div>
-              </div>
-
-              <!-- Histórico mensal -->
-              <div class="card">
-                <div class="card-header"><span>Histórico de aportes</span></div>
-                <div style="padding: 1.25rem">
-                  <table class="report-table">
-                    <thead>
-                      <tr>
-                        <th>Mês</th>
-                        <th class="num">Independência</th>
-                        <th class="num">Reserva</th>
-                        <th class="num">Total aporte</th>
-                        <th class="num">Acumulado</th>
-                      </tr>
-                    </thead>
-                    <tbody id="inv-history-body"></tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <!-- Coluna direita: pizza + saldo total por classe -->
-            <div style="display: flex; flex-direction: column; gap: 1.5rem">
-              <div class="card">
-                <div class="card-header"><span>Distribuição</span></div>
-                <div class="chart-panel">
-                  <div class="chart-wrap">
-                    <canvas
-                      id="invPieChart"
-                      role="img"
-                      aria-label="Distribuição da carteira de investimentos"
-                      width="200"
-                      height="200"
-                    ></canvas>
-                    <div class="chart-center">
-                      <div class="chart-center-lbl">Este mês</div>
-                      <div class="chart-center-val" id="inv-chart-center">
-                        R$ 0,00
-                      </div>
-                    </div>
-                  </div>
-                  <div class="legend" id="inv-legend"></div>
-                </div>
-              </div>
-
-              <!-- Saldo acumulado por classe -->
-              <div class="card">
-                <div class="card-header">
-                  <span>Saldo total por classe</span>
-                </div>
-                <div style="padding: 1.25rem">
-                  <div id="inv-saldo-classes"></div>
-                  <div
-                    style="
-                      border-top: 0.5px solid var(--border);
-                      margin-top: 10px;
-                      padding-top: 10px;
-                      display: flex;
-                      justify-content: space-between;
-                      align-items: center;
-                    "
-                  >
-                    <span
-                      style="
-                        font-size: 11px;
-                        text-transform: uppercase;
-                        letter-spacing: 0.06em;
-                        color: var(--text3);
-                      "
-                      >Total acumulado</span
-                    >
-                    <span
-                      style="
-                        font-size: 15px;
-                        font-weight: 500;
-                        color: var(--text);
-                      "
-                      id="inv-total-acum"
-                      >R$ 0,00</span
-                    >
-                  </div>
-                </div>
-              </div>
-            </div>
+            <div class="legend" id="legend"></div>
           </div>
         </div>
       </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="assets/js/supabase.js"></script>
-    <script src="assets/js/app.js"></script>
-  </body>
+    <!-- Por período -->
+    <div class="page" id="page-period">
+      <div class="period-controls">
+        <label>Período</label>
+        <select id="period-select">
+          <option value="3">Últimos 3 meses</option>
+          <option value="6" selected>Últimos 6 meses</option>
+          <option value="12">Últimos 12 meses</option>
+        </select>
+      </div>
+      <div class="metric-grid" id="period-metrics"></div>
+      <div class="period-grid">
+        <div class="card">
+          <div class="card-header"><span>Renda vs. gastos</span></div>
+          <div style="padding:1.25rem">
+            <div class="period-chart-wrap"><canvas id="barChart" role="img" aria-label="Gráfico comparativo de renda e gastos por mês"></canvas></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span>Composição por categoria</span></div>
+          <div style="padding:1.25rem">
+            <div class="period-chart-wrap"><canvas id="stackChart" role="img" aria-label="Gráfico de composição de gastos por categoria ao longo dos meses"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Relatório -->
+    <div class="page" id="page-report">
+      <div class="report-controls">
+        <label style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Período</label>
+        <select id="report-period">
+          <option value="3">Últimos 3 meses</option>
+          <option value="6" selected>Últimos 6 meses</option>
+          <option value="12">Últimos 12 meses</option>
+        </select>
+        <button class="btn" onclick="window.print()"><i class="ti ti-printer"></i> Imprimir</button>
+      </div>
+
+      <div class="report-card" id="report-content"></div>
+
+      <div class="report-card">
+        <div class="ai-label"><i class="ti ti-chart-dots"></i> Parecer do período</div>
+        <div class="ai-box" id="ai-output">Selecione um período para visualizar o parecer.</div>
+      </div>
+    </div>
+
+
+    <!-- Investimentos -->
+    <div class="page" id="page-invest">
+
+      <!-- Cards de aporte do mês atual -->
+      <div class="metric-grid" id="invest-metrics" style="margin-bottom:1.5rem"></div>
+
+      <div style="display:grid;grid-template-columns:1fr 300px;gap:1.5rem;">
+
+        <!-- Coluna esquerda -->
+        <div style="display:flex;flex-direction:column;gap:1.5rem;">
+
+          <!-- Aportes do mês: lançados na calculadora -->
+          <div class="card">
+            <div class="card-header"><span>Aporte do mês — <span id="inv-month-lbl"></span></span></div>
+            <div id="inv-aporte-rows" style="padding:1.25rem;display:flex;flex-direction:column;gap:10px"></div>
+          </div>
+
+          <!-- Composição da carteira (classes de ativo) -->
+          <div class="card">
+            <div class="card-header">
+              <span>Composição da carteira</span>
+              <span id="inv-pct-lbl" style="font-size:11px"></span>
+            </div>
+            <div id="inv-pct-warning" style="display:none"></div>
+            <div id="inv-classes"></div>
+          </div>
+
+          <!-- Histórico mensal -->
+          <div class="card">
+            <div class="card-header"><span>Histórico de aportes</span></div>
+            <div style="padding:1.25rem">
+              <table class="report-table">
+                <thead><tr>
+                  <th>Mês</th>
+                  <th class="num">Independência</th>
+                  <th class="num">Reserva</th>
+                  <th class="num">Total aporte</th>
+                  <th class="num">Acumulado</th>
+                </tr></thead>
+                <tbody id="inv-history-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Coluna direita: pizza + saldo total por classe -->
+        <div style="display:flex;flex-direction:column;gap:1.5rem;">
+          <div class="card">
+            <div class="card-header"><span>Distribuição</span></div>
+            <div class="chart-panel">
+              <div class="chart-wrap">
+                <canvas id="invPieChart" role="img" aria-label="Distribuição da carteira de investimentos" width="200" height="200"></canvas>
+                <div class="chart-center">
+                  <div class="chart-center-lbl">Este mês</div>
+                  <div class="chart-center-val" id="inv-chart-center">R$ 0,00</div>
+                </div>
+              </div>
+              <div class="legend" id="inv-legend"></div>
+            </div>
+          </div>
+
+          <!-- Saldo acumulado por classe -->
+          <div class="card">
+            <div class="card-header"><span>Saldo total por classe</span></div>
+            <div style="padding:1.25rem">
+              <div id="inv-saldo-classes"></div>
+              <div style="border-top:0.5px solid var(--border);margin-top:10px;padding-top:10px;display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Total acumulado</span>
+                <span style="font-size:15px;font-weight:500;color:var(--text)" id="inv-total-acum">R$ 0,00</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+
+    <!-- Perfil -->
+    <div class="page" id="page-profile">
+      <div class="profile-grid">
+
+        <!-- Coluna esquerda: avatar + info -->
+        <div class="card profile-card-left">
+          <div class="profile-avatar-wrap">
+            <div class="profile-avatar" id="profile-avatar-display">G</div>
+            <div class="profile-avatar-overlay" id="profile-avatar-btn" title="Alterar foto">
+              <i class="ti ti-camera"></i>
+            </div>
+            <input type="file" id="profile-avatar-input" accept="image/*" style="display:none">
+          </div>
+          <div class="profile-name-display" id="profile-name-display">Carregando...</div>
+          <div class="profile-email-display" id="profile-email-display"></div>
+          <div class="profile-avatar-note">Upload de foto disponível em breve</div>
+        </div>
+
+        <!-- Coluna direita: formulários -->
+        <div style="display:flex;flex-direction:column;gap:1.5rem;">
+
+          <!-- Dados pessoais -->
+          <div class="card">
+            <div class="card-header"><span>Dados pessoais</span></div>
+            <div class="profile-form">
+              <div id="profile-msg" class="profile-msg" style="display:none"></div>
+              <div class="profile-field">
+                <label>Nome completo</label>
+                <input type="text" id="profile-name" placeholder="Seu nome">
+              </div>
+              <div class="profile-field">
+                <label>E-mail</label>
+                <input type="email" id="profile-email" placeholder="seu@email.com">
+              </div>
+              <button class="btn btn-primary" id="btn-save-profile">Salvar alterações</button>
+            </div>
+          </div>
+
+          <!-- Alterar senha -->
+          <div class="card">
+            <div class="card-header"><span>Alterar senha</span></div>
+            <div class="profile-form">
+              <div id="password-msg" class="profile-msg" style="display:none"></div>
+              <div class="profile-field">
+                <label>Nova senha</label>
+                <input type="password" id="profile-new-password" placeholder="Mínimo 6 caracteres">
+              </div>
+              <div class="profile-field">
+                <label>Confirmar nova senha</label>
+                <input type="password" id="profile-confirm-password" placeholder="Repita a senha">
+              </div>
+              <button class="btn btn-primary" id="btn-save-password">Alterar senha</button>
+            </div>
+          </div>
+
+          <!-- Sair -->
+          <div class="card">
+            <div class="card-header"><span>Sessão</span></div>
+            <div class="profile-form">
+              <p style="font-size:12px;color:var(--text2);margin-bottom:1rem">Ao sair, você precisará fazer login novamente para acessar suas informações.</p>
+              <button class="btn btn-logout" id="btn-logout"><i class="ti ti-logout"></i> Sair da conta</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal confirmação logout -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <h3>Sair da conta</h3>
+    <p>Tem certeza que deseja sair? Você precisará fazer login novamente para acessar suas informações.</p>
+    <div class="confirm-btns">
+      <button class="btn" id="confirm-cancel">Cancelar</button>
+      <button class="btn btn-logout" id="confirm-logout"><i class="ti ti-logout"></i> Sair</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/supabase.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
 </html>
