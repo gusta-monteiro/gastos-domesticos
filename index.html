@@ -1,313 +1,128 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gastos Domésticos</title>
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap"
-      rel="stylesheet"
-    />
-    <link
-      href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="assets/css/main.css" />
-  </head>
-  <body>
-    <div class="shell">
-      <!-- Sidebar -->
-      <aside class="sidebar">
-        <div class="sidebar-logo">
-          <h1>Finanças</h1>
-          <p>Gestão doméstica</p>
-        </div>
-        <nav class="sidebar-nav">
-          <div class="nav-item active" data-page="calc">
-            <i class="ti ti-calculator"></i> Calculadora
-          </div>
-          <div class="nav-item" data-page="period">
-            <i class="ti ti-chart-line"></i> Por período
-          </div>
-          <div class="nav-item" data-page="report">
-            <i class="ti ti-file-text"></i> Relatório
-          </div>
-          <div class="nav-item" data-page="invest">
-            <i class="ti ti-trending-up"></i> Investimentos
-          </div>
-        </nav>
-      </aside>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculadora de Finanças Pessoais</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/landing.css">
+</head>
+<body>
 
-      <div class="content">
-        <!-- Topbar -->
-        <div class="topbar">
-          <div class="topbar-left">
-            <span class="page-title" id="page-title">Calculadora</span>
-            <div class="month-nav" id="month-nav">
-              <button id="prev-month" aria-label="Mês anterior">
-                <i class="ti ti-chevron-left"></i>
-              </button>
-              <span class="month-label" id="month-label"></span>
-              <button id="next-month" aria-label="Próximo mês">
-                <i class="ti ti-chevron-right"></i>
-              </button>
-            </div>
-          </div>
-          <div class="renda-wrap">
-            <label>Renda</label>
-            <span class="renda-prefix">R$</span>
-            <input
-              type="number"
-              id="renda"
-              placeholder="0"
-              min="0"
-              step="100"
-            />
-          </div>
-        </div>
+<nav>
+  <span class="nav-logo">Finanças <span>Pessoais</span></span>
+  <div class="nav-actions">
+    <a href="auth.html" class="btn-ghost">Entrar</a>
+    <a href="auth.html#signup" class="btn-solid">Cadastrar-se — é gratuito</a>
+  </div>
+</nav>
 
-        <!-- Calculadora -->
-        <div class="page active" id="page-calc">
-          <div class="metric-grid" id="metric-grid"></div>
-          <div class="calc-grid">
-            <div class="card">
-              <div class="card-header">
-                <span>Categorias</span>
-                <span id="pct-total-lbl" style="font-size: 11px"></span>
-              </div>
-              <div id="pct-warning" style="display: none"></div>
-              <div id="categories"></div>
-            </div>
-            <div class="card">
-              <div class="card-header"><span>Distribuição</span></div>
-              <div class="chart-panel">
-                <div class="chart-wrap">
-                  <canvas
-                    id="pieChart"
-                    role="img"
-                    aria-label="Gráfico de distribuição dos gastos por categoria"
-                    width="200"
-                    height="200"
-                  ></canvas>
-                  <div class="chart-center">
-                    <div class="chart-center-lbl">Total</div>
-                    <div class="chart-center-val" id="chart-center-val">
-                      R$ 0
-                    </div>
-                  </div>
-                </div>
-                <div class="legend" id="legend"></div>
-              </div>
-            </div>
-          </div>
-        </div>
+<section class="hero">
+  <span class="hero-tag">Gestão financeira pessoal</span>
+  <h1>Controle suas finanças<br><em>com clareza e simplicidade</em></h1>
+  <p>Organize sua renda mensal, acompanhe seus gastos por categoria, visualize seus investimentos e receba um parecer automático sobre sua saúde financeira.</p>
+  <div class="hero-actions">
+    <a href="auth.html#signup" class="btn-hero">Começar gratuitamente</a>
+    <a href="auth.html" class="btn-hero-ghost">Já tenho conta</a>
+  </div>
+</section>
 
-        <!-- Por período -->
-        <div class="page" id="page-period">
-          <div class="period-controls">
-            <label>Período</label>
-            <select id="period-select">
-              <option value="3">Últimos 3 meses</option>
-              <option value="6" selected>Últimos 6 meses</option>
-              <option value="12">Últimos 12 meses</option>
-            </select>
-          </div>
-          <div class="metric-grid" id="period-metrics"></div>
-          <div class="period-grid">
-            <div class="card">
-              <div class="card-header"><span>Renda vs. gastos</span></div>
-              <div style="padding: 1.25rem">
-                <div class="period-chart-wrap">
-                  <canvas
-                    id="barChart"
-                    role="img"
-                    aria-label="Gráfico comparativo de renda e gastos por mês"
-                  ></canvas>
-                </div>
-              </div>
-            </div>
-            <div class="card">
-              <div class="card-header">
-                <span>Composição por categoria</span>
-              </div>
-              <div style="padding: 1.25rem">
-                <div class="period-chart-wrap">
-                  <canvas
-                    id="stackChart"
-                    role="img"
-                    aria-label="Gráfico de composição de gastos por categoria ao longo dos meses"
-                  ></canvas>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Relatório -->
-        <div class="page" id="page-report">
-          <div class="report-controls">
-            <label
-              style="
-                font-size: 11px;
-                text-transform: uppercase;
-                letter-spacing: 0.06em;
-                color: var(--text3);
-              "
-              >Período</label
-            >
-            <select id="report-period">
-              <option value="3">Últimos 3 meses</option>
-              <option value="6" selected>Últimos 6 meses</option>
-              <option value="12">Últimos 12 meses</option>
-            </select>
-            <button class="btn" onclick="window.print()">
-              <i class="ti ti-printer"></i> Imprimir
-            </button>
-          </div>
-
-          <div class="report-card" id="report-content"></div>
-
-          <div class="report-card">
-            <div class="ai-label">
-              <i class="ti ti-chart-dots"></i> Parecer do período
-            </div>
-            <div class="ai-box" id="ai-output">
-              Selecione um período para visualizar o parecer.
-            </div>
-          </div>
-        </div>
-
-        <!-- Investimentos -->
-        <div class="page" id="page-invest">
-          <!-- Cards de aporte do mês atual -->
-          <div
-            class="metric-grid"
-            id="invest-metrics"
-            style="margin-bottom: 1.5rem"
-          ></div>
-
-          <div
-            style="display: grid; grid-template-columns: 1fr 300px; gap: 1.5rem"
-          >
-            <!-- Coluna esquerda -->
-            <div style="display: flex; flex-direction: column; gap: 1.5rem">
-              <!-- Aportes do mês: lançados na calculadora -->
-              <div class="card">
-                <div class="card-header">
-                  <span>Aporte do mês — <span id="inv-month-lbl"></span></span>
-                </div>
-                <div
-                  id="inv-aporte-rows"
-                  style="
-                    padding: 1.25rem;
-                    display: flex;
-                    flex-direction: column;
-                    gap: 10px;
-                  "
-                ></div>
-              </div>
-
-              <!-- Composição da carteira (classes de ativo) -->
-              <div class="card">
-                <div class="card-header">
-                  <span>Composição da carteira</span>
-                  <span id="inv-pct-lbl" style="font-size: 11px"></span>
-                </div>
-                <div id="inv-pct-warning" style="display: none"></div>
-                <div id="inv-classes"></div>
-              </div>
-
-              <!-- Histórico mensal -->
-              <div class="card">
-                <div class="card-header"><span>Histórico de aportes</span></div>
-                <div style="padding: 1.25rem">
-                  <table class="report-table">
-                    <thead>
-                      <tr>
-                        <th>Mês</th>
-                        <th class="num">Independência</th>
-                        <th class="num">Reserva</th>
-                        <th class="num">Total aporte</th>
-                        <th class="num">Acumulado</th>
-                      </tr>
-                    </thead>
-                    <tbody id="inv-history-body"></tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <!-- Coluna direita: pizza + saldo total por classe -->
-            <div style="display: flex; flex-direction: column; gap: 1.5rem">
-              <div class="card">
-                <div class="card-header"><span>Distribuição</span></div>
-                <div class="chart-panel">
-                  <div class="chart-wrap">
-                    <canvas
-                      id="invPieChart"
-                      role="img"
-                      aria-label="Distribuição da carteira de investimentos"
-                      width="200"
-                      height="200"
-                    ></canvas>
-                    <div class="chart-center">
-                      <div class="chart-center-lbl">Este mês</div>
-                      <div class="chart-center-val" id="inv-chart-center">
-                        R$ 0,00
-                      </div>
-                    </div>
-                  </div>
-                  <div class="legend" id="inv-legend"></div>
-                </div>
-              </div>
-
-              <!-- Saldo acumulado por classe -->
-              <div class="card">
-                <div class="card-header">
-                  <span>Saldo total por classe</span>
-                </div>
-                <div style="padding: 1.25rem">
-                  <div id="inv-saldo-classes"></div>
-                  <div
-                    style="
-                      border-top: 0.5px solid var(--border);
-                      margin-top: 10px;
-                      padding-top: 10px;
-                      display: flex;
-                      justify-content: space-between;
-                      align-items: center;
-                    "
-                  >
-                    <span
-                      style="
-                        font-size: 11px;
-                        text-transform: uppercase;
-                        letter-spacing: 0.06em;
-                        color: var(--text3);
-                      "
-                      >Total acumulado</span
-                    >
-                    <span
-                      style="
-                        font-size: 15px;
-                        font-weight: 500;
-                        color: var(--text);
-                      "
-                      id="inv-total-acum"
-                      >R$ 0,00</span
-                    >
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+<div class="preview-wrap">
+  <div class="preview-box">
+    <div class="preview-card">
+      <div class="preview-card-label">Renda</div>
+      <div class="preview-card-val">R$ 5.000,00</div>
+    </div>
+    <div class="preview-card">
+      <div class="preview-card-label">Lançado</div>
+      <div class="preview-card-val">R$ 3.820,00</div>
+      <div class="preview-card-sub">76% da renda</div>
+    </div>
+    <div class="preview-card">
+      <div class="preview-card-label">Saldo</div>
+      <div class="preview-card-val green">R$ 1.180,00</div>
+    </div>
+    <div class="preview-bars">
+      <div class="preview-bar-row">
+        <span class="preview-bar-label">Independência Financeira</span>
+        <div class="preview-bar-track"><div class="preview-bar-fill" style="width:80%;background:#1a1a18"></div></div>
+        <span class="preview-bar-pct">10%</span>
+      </div>
+      <div class="preview-bar-row">
+        <span class="preview-bar-label">Custos Fixos</span>
+        <div class="preview-bar-track"><div class="preview-bar-fill" style="width:100%;background:#5f5e5a"></div></div>
+        <span class="preview-bar-pct">55%</span>
+      </div>
+      <div class="preview-bar-row">
+        <span class="preview-bar-label">Custos Variáveis</span>
+        <div class="preview-bar-track"><div class="preview-bar-fill" style="width:60%;background:#888780"></div></div>
+        <span class="preview-bar-pct">20%</span>
+      </div>
+      <div class="preview-bar-row">
+        <span class="preview-bar-label">Conforto</span>
+        <div class="preview-bar-track"><div class="preview-bar-fill" style="width:40%;background:#b4b2a9"></div></div>
+        <span class="preview-bar-pct">10%</span>
+      </div>
+      <div class="preview-bar-row">
+        <span class="preview-bar-label">Reserva de Emergência</span>
+        <div class="preview-bar-track"><div class="preview-bar-fill" style="width:100%;background:#d3d1c7"></div></div>
+        <span class="preview-bar-pct">5%</span>
       </div>
     </div>
+  </div>
+</div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="assets/js/supabase.js"></script>
-    <script src="assets/js/app.js"></script>
-  </body>
+<section class="features">
+  <div class="features-inner">
+    <div class="features-label">O que você encontra aqui</div>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">◎</div>
+        <div class="feature-title">Calculadora mensal</div>
+        <div class="feature-desc">Registre sua renda e lance seus gastos mês a mês, organizados por categoria com metas de proporção.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">◈</div>
+        <div class="feature-title">Visão por período</div>
+        <div class="feature-desc">Compare renda e gastos ao longo dos meses com gráficos de evolução e composição por categoria.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">◇</div>
+        <div class="feature-title">Relatório com parecer</div>
+        <div class="feature-desc">Gere relatórios do período com análise automática baseada nas suas métricas financeiras.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">△</div>
+        <div class="feature-title">Carteira de investimentos</div>
+        <div class="feature-desc">Acompanhe seus aportes mensais, distribua por classes de ativos e veja o acumulado crescer.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">○</div>
+        <div class="feature-title">Dados na nuvem</div>
+        <div class="feature-desc">Seus dados ficam salvos com segurança e acessíveis de qualquer dispositivo, a qualquer hora.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">□</div>
+        <div class="feature-title">Totalmente gratuito</div>
+        <div class="feature-desc">Sem planos pagos, sem limitações escondidas. Crie sua conta e comece a usar agora.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="cta">
+  <h2>Comece a organizar suas finanças hoje</h2>
+  <p>Crie sua conta gratuitamente e tenha controle real sobre o seu dinheiro.</p>
+  <div class="cta-actions">
+    <a href="auth.html#signup" class="btn-hero">Criar conta gratuita</a>
+    <a href="auth.html" class="btn-hero-ghost">Já tenho conta</a>
+  </div>
+</section>
+
+<footer>
+  <p>Calculadora de Finanças Pessoais</p>
+  <p>Feito com simplicidade e propósito.</p>
+</footer>
+
+</body>
 </html>

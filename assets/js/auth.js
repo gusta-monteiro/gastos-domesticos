@@ -13,7 +13,7 @@ if (window.location.hash === "#signup") setTab("signup");
 
 /* ── Se já estiver logado, vai direto para a calculadora ── */
 db.auth.getSession().then(({ data: { session } }) => {
-  if (session) window.location.href = "index.html";
+  if (session) window.location.href = "app.html";
 });
 
 /* ── Helpers ── */
@@ -52,7 +52,7 @@ document.getElementById("btn-login").addEventListener("click", async () => {
     return;
   }
 
-  window.location.href = "index.html";
+  window.location.href = "app.html";
 });
 
 /* ── Cadastro ── */
