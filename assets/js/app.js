@@ -1,6 +1,8 @@
 /* ── Verificação de sessão ── */
-db.auth.getSession().then(({ data: { session } }) => {
-  if (!session) window.location.href = "auth.html";
+db.auth.onAuthStateChange((event, session) => {
+  if (event === "SIGNED_OUT" || (!session && event !== "INITIAL_SESSION")) {
+    window.location.href = "auth.html";
+  }
 });
 const CATS = [
   {
