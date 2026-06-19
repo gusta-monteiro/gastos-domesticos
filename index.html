@@ -327,6 +327,7 @@
       <div class="nav-item active" data-page="calc"><i class="ti ti-calculator"></i> Calculadora</div>
       <div class="nav-item" data-page="period"><i class="ti ti-chart-line"></i> Por período</div>
       <div class="nav-item" data-page="report"><i class="ti ti-file-text"></i> Relatório</div>
+      <div class="nav-item" data-page="invest"><i class="ti ti-trending-up"></i> Investimentos</div>
     </nav>
   </aside>
 
@@ -414,31 +415,94 @@
           <option value="12">Últimos 12 meses</option>
         </select>
         <button class="btn" onclick="window.print()"><i class="ti ti-printer"></i> Imprimir</button>
-        <button class="btn btn-primary" id="gen-ai-btn"><i class="ti ti-sparkles"></i> Gerar análise IA</button>
-        <button class="btn" id="api-key-btn" style="font-size:11px;color:var(--text3)"><i class="ti ti-key"></i> API key</button>
       </div>
 
       <div class="report-card" id="report-content"></div>
 
       <div class="report-card">
-        <div class="ai-label"><i class="ti ti-sparkles"></i> Análise gerada por IA</div>
-        <div class="ai-box" id="ai-output">Clique em "Gerar análise IA" para obter um parecer baseado nas suas métricas financeiras.</div>
+        <div class="ai-label"><i class="ti ti-chart-dots"></i> Parecer do período</div>
+        <div class="ai-box" id="ai-output">Selecione um período para visualizar o parecer.</div>
       </div>
     </div>
 
-  </div>
-</div>
 
-<!-- Modal API Key -->
-<div class="modal-overlay" id="modal-overlay">
-  <div class="modal">
-    <h2>Chave de API Anthropic</h2>
-    <p>Para gerar análises com IA, insira sua chave de API da Anthropic. Ela é salva localmente no seu navegador e nunca enviada a terceiros.</p>
-    <input type="password" id="api-key-input" placeholder="sk-ant-...">
-    <div class="modal-btns">
-      <button class="btn" onclick="document.getElementById('modal-overlay').classList.remove('open')">Cancelar</button>
-      <button class="btn btn-primary" id="save-key-btn">Salvar chave</button>
+    <!-- Investimentos -->
+    <div class="page" id="page-invest">
+
+      <!-- Cards de aporte do mês atual -->
+      <div class="metric-grid" id="invest-metrics" style="margin-bottom:1.5rem"></div>
+
+      <div style="display:grid;grid-template-columns:1fr 300px;gap:1.5rem;">
+
+        <!-- Coluna esquerda -->
+        <div style="display:flex;flex-direction:column;gap:1.5rem;">
+
+          <!-- Aportes do mês: lançados na calculadora -->
+          <div class="card">
+            <div class="card-header"><span>Aporte do mês — <span id="inv-month-lbl"></span></span></div>
+            <div id="inv-aporte-rows" style="padding:1.25rem;display:flex;flex-direction:column;gap:10px"></div>
+          </div>
+
+          <!-- Composição da carteira (classes de ativo) -->
+          <div class="card">
+            <div class="card-header">
+              <span>Composição da carteira</span>
+              <span id="inv-pct-lbl" style="font-size:11px"></span>
+            </div>
+            <div id="inv-pct-warning" style="display:none"></div>
+            <div id="inv-classes"></div>
+          </div>
+
+          <!-- Histórico mensal -->
+          <div class="card">
+            <div class="card-header"><span>Histórico de aportes</span></div>
+            <div style="padding:1.25rem">
+              <table class="report-table">
+                <thead><tr>
+                  <th>Mês</th>
+                  <th class="num">Independência</th>
+                  <th class="num">Reserva</th>
+                  <th class="num">Total aporte</th>
+                  <th class="num">Acumulado</th>
+                </tr></thead>
+                <tbody id="inv-history-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Coluna direita: pizza + saldo total por classe -->
+        <div style="display:flex;flex-direction:column;gap:1.5rem;">
+          <div class="card">
+            <div class="card-header"><span>Distribuição</span></div>
+            <div class="chart-panel">
+              <div class="chart-wrap">
+                <canvas id="invPieChart" role="img" aria-label="Distribuição da carteira de investimentos" width="200" height="200"></canvas>
+                <div class="chart-center">
+                  <div class="chart-center-lbl">Este mês</div>
+                  <div class="chart-center-val" id="inv-chart-center">R$ 0,00</div>
+                </div>
+              </div>
+              <div class="legend" id="inv-legend"></div>
+            </div>
+          </div>
+
+          <!-- Saldo acumulado por classe -->
+          <div class="card">
+            <div class="card-header"><span>Saldo total por classe</span></div>
+            <div style="padding:1.25rem">
+              <div id="inv-saldo-classes"></div>
+              <div style="border-top:0.5px solid var(--border);margin-top:10px;padding-top:10px;display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Total acumulado</span>
+                <span style="font-size:15px;font-weight:500;color:var(--text)" id="inv-total-acum">R$ 0,00</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
     </div>
+
   </div>
 </div>
 
@@ -470,7 +534,7 @@ function setApiKey(k) { localStorage.setItem('fin_api_key', k); }
 /* ── Formatting ── */
 function fmt(v) {
   const n = parseFloat(v) || 0;
-  return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 function pct(a, b) { return b > 0 ? Math.round(a / b * 100) : 0; }
 
@@ -486,6 +550,7 @@ document.querySelectorAll('.nav-item').forEach(el => {
     document.getElementById('month-nav').style.display = pg === 'calc' ? 'flex' : 'none';
     if (pg === 'period') renderPeriod();
     if (pg === 'report') renderReport();
+    if (pg === 'invest') renderInvest();
   });
 });
 
@@ -819,97 +884,380 @@ function renderReport() {
   html += `</tbody></table>`;
 
   document.getElementById('report-content').innerHTML = html;
+  gerarParecer(months);
 }
 
 document.getElementById('report-period').addEventListener('change', renderReport);
 
-/* ══ IA ══ */
-document.getElementById('gen-ai-btn').addEventListener('click', async () => {
-  const key = getApiKey();
-  if (!key) {
-    document.getElementById('modal-overlay').classList.add('open');
-    return;
-  }
-  await generateAI(key);
-});
-
-async function generateAI(key) {
-  const box = document.getElementById('ai-output');
-  box.className = 'ai-box loading';
-  box.textContent = 'Gerando análise...';
-
-  const n = parseInt(document.getElementById('report-period').value);
-  const months = getPeriodMonths(n);
-  const rows = months.map(({m, y}) => {
+/* ══ PARECER AUTOMÁTICO ══ */
+function gerarParecer(months) {
+  const data = months.map(({m, y}) => {
     const md = loadMonth(m, y);
     const renda = parseFloat(md.renda)||0;
-    const cats = md.cats.map((c, ci) => {
-      const lancado = c.items.reduce((s, it) => s + (parseFloat(it.value)||0), 0);
-      return `${CATS[ci].label}: alocado ${c.pct}% (R$${(renda*c.pct/100).toFixed(0)}), lançado R$${lancado.toFixed(0)}`;
-    });
-    const totalLancado = md.cats.reduce((s, c) => s + c.items.reduce((ss, it) => ss + (parseFloat(it.value)||0), 0), 0);
-    return `${MONTHS[m]}/${y}: Renda R$${renda.toFixed(0)}, Gasto R$${totalLancado.toFixed(0)}, Saldo R$${(renda - totalLancado).toFixed(0)}\n  ${cats.join('\n  ')}`;
-  }).join('\n\n');
+    const gasto = md.cats.reduce((s, c) => s + c.items.reduce((ss, it) => ss + (parseFloat(it.value)||0), 0), 0);
+    const catVals = md.cats.map((c, ci) => ({
+      label: CATS[ci].label,
+      pct: parseFloat(c.pct)||0,
+      meta: CATS[ci].pct,
+      lancado: c.items.reduce((s, it) => s + (parseFloat(it.value)||0), 0),
+      alocado: renda * (parseFloat(c.pct)||0) / 100,
+    }));
+    return { label: `${MONTHS[m].slice(0,3)}/${y}`, renda, gasto, saldo: renda - gasto, catVals };
+  }).filter(d => d.renda > 0);
 
-  const prompt = `Você é um consultor financeiro pessoal. Analise os dados financeiros abaixo e forneça um parecer objetivo, direto e útil em português.
-
-Métricas alvo do usuário:
-- Independência Financeira: 10% da renda
-- Custos Fixos: 55% da renda
-- Custos Variáveis: 20% da renda
-- Conforto: 10% da renda
-- Reserva de Emergência: 5% da renda
-
-Dados do período (${n} meses):
-${rows}
-
-Forneça:
-1. Um diagnóstico do comportamento financeiro no período
-2. Categorias fora da meta e sugestões de ajuste
-3. Pontos positivos observados
-4. Uma recomendação prioritária para o próximo mês
-
-Seja direto, sem introduções genéricas. Foque nos dados reais.`;
-
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    const d = await res.json();
-    if (d.error) throw new Error(d.error.message);
-    box.className = 'ai-box';
-    box.textContent = d.content[0].text;
-  } catch(e) {
-    box.className = 'ai-box';
-    box.textContent = 'Erro ao gerar análise: ' + e.message;
+  if (data.length === 0) {
+    document.getElementById('ai-output').textContent = 'Nenhum dado encontrado no período selecionado. Preencha a renda e os gastos nos meses para visualizar o parecer.';
+    return;
   }
+
+  const n = data.length;
+  const totalRenda = data.reduce((s, d) => s + d.renda, 0);
+  const totalGasto = data.reduce((s, d) => s + d.gasto, 0);
+  const totalSaldo = totalRenda - totalGasto;
+  const taxaMedia = totalRenda > 0 ? (totalGasto / totalRenda * 100) : 0;
+
+  const mesesNegativo = data.filter(d => d.saldo < 0).length;
+  const mesesPositivo = data.filter(d => d.saldo >= 0).length;
+
+  let linhas = [];
+
+  /* Diagnóstico geral */
+  linhas.push('── Diagnóstico geral ──────────────────');
+  if (taxaMedia <= 75) {
+    linhas.push(`✔ Taxa média de gasto em ${taxaMedia.toFixed(1)}% da renda — dentro de um patamar saudável.`);
+  } else if (taxaMedia <= 90) {
+    linhas.push(`⚠ Taxa média de gasto em ${taxaMedia.toFixed(1)}% da renda — atenção, margem de segurança reduzida.`);
+  } else {
+    linhas.push(`✘ Taxa média de gasto em ${taxaMedia.toFixed(1)}% da renda — comprometimento elevado, revisar categorias.`);
+  }
+
+  if (mesesNegativo > 0) {
+    linhas.push(`${mesesNegativo} de ${n} ${n === 1 ? 'mês' : 'meses'} analisados fechou no negativo.`);
+  } else {
+    linhas.push(`Todos os ${n} ${n === 1 ? 'mês analisado fechou' : 'meses analisados fecharam'} com saldo positivo.`);
+  }
+
+  linhas.push('');
+
+  /* Análise por categoria (média dos meses com dados) */
+  linhas.push('── Categorias vs. metas ───────────────');
+  const catAgg = CATS.map((def, ci) => {
+    const totalLancado = data.reduce((s, d) => s + (d.catVals[ci]?.lancado || 0), 0);
+    const totalAlocado = data.reduce((s, d) => s + (d.catVals[ci]?.alocado || 0), 0);
+    const uso = totalAlocado > 0 ? (totalLancado / totalAlocado * 100) : 0;
+    return { label: def.label, pct: def.pct, uso, totalLancado, totalAlocado };
+  });
+
+  catAgg.forEach(c => {
+    if (c.totalAlocado === 0) return;
+    const icon = c.uso > 100 ? '✘' : c.uso > 85 ? '⚠' : '✔';
+    const status = c.uso > 100 ? `acima do limite (${c.uso.toFixed(0)}% do alocado)` :
+                   c.uso > 85  ? `próximo do limite (${c.uso.toFixed(0)}% do alocado)` :
+                                 `dentro da meta (${c.uso.toFixed(0)}% do alocado)`;
+    linhas.push(`${icon} ${c.label} — ${status}`);
+  });
+
+  linhas.push('');
+
+  /* Recomendação */
+  linhas.push('── Recomendação ───────────────────────');
+  const maisEstourada = catAgg.filter(c => c.totalAlocado > 0).sort((a, b) => b.uso - a.uso)[0];
+  const menorUso = catAgg.filter(c => c.totalAlocado > 0 && c.uso < 50).sort((a, b) => a.uso - b.uso)[0];
+
+  if (maisEstourada && maisEstourada.uso > 100) {
+    linhas.push(`Prioridade: revisar os gastos em "${maisEstourada.label}", que ultrapassou o alocado no período.`);
+  } else if (taxaMedia > 85) {
+    linhas.push('Reduzir custos variáveis e de conforto para ampliar a margem de saldo mensal.');
+  } else {
+    linhas.push('Comportamento financeiro estável. Considere aumentar a reserva de emergência ou o aporte em independência financeira.');
+  }
+
+  if (menorUso) {
+    linhas.push(`A categoria "${menorUso.label}" foi pouco utilizada (${menorUso.uso.toFixed(0)}% do alocado) — avalie se a meta está bem calibrada.`);
+  }
+
+  document.getElementById('ai-output').textContent = linhas.join('\n');
 }
 
-/* ── Modal API key ── */
-document.getElementById('api-key-btn').addEventListener('click', () => {
-  document.getElementById('api-key-input').value = getApiKey();
-  document.getElementById('modal-overlay').classList.add('open');
-});
-document.getElementById('save-key-btn').addEventListener('click', () => {
-  setApiKey(document.getElementById('api-key-input').value.trim());
-  document.getElementById('modal-overlay').classList.remove('open');
-});
-document.getElementById('modal-overlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('modal-overlay')) document.getElementById('modal-overlay').classList.remove('open');
-});
+
+/* ══ INVESTIMENTOS ══ */
+const INV_CLASSES_DEFAULT = [
+  { key: 'renda_fixa', label: 'Renda Fixa',    pct: 40, color: '#1a1a18' },
+  { key: 'acoes',      label: 'Ações',          pct: 30, color: '#5f5e5a' },
+  { key: 'fii',        label: 'FII',            pct: 20, color: '#888780' },
+  { key: 'exterior',   label: 'Internacional',  pct: 10, color: '#b4b2a9' },
+];
+
+let invPieChart = null;
+
+function loadInvClasses() {
+  const raw = localStorage.getItem('fin_inv_classes');
+  return raw ? JSON.parse(raw) : INV_CLASSES_DEFAULT.map(c => ({ ...c }));
+}
+function saveInvClasses(cls) { localStorage.setItem('fin_inv_classes', JSON.stringify(cls)); }
+
+/* Pega os valores LANÇADOS nos itens de independencia e emergencia do mês */
+function getInvLancados(m, y) {
+  const md = loadMonth(m, y);
+  const catIndep = md.cats.find(c => c.key === 'independencia');
+  const catEmerg = md.cats.find(c => c.key === 'emergencia');
+  const indep = catIndep ? catIndep.items.reduce((s, it) => s + (parseFloat(it.value)||0), 0) : 0;
+  const emerg = catEmerg ? catEmerg.items.reduce((s, it) => s + (parseFloat(it.value)||0), 0) : 0;
+  return { indep, emerg, total: indep + emerg };
+}
+
+function renderInvest() {
+  const classes = loadInvClasses();
+  const { indep, emerg, total } = getInvLancados(curMonth, curYear);
+
+  document.getElementById('inv-month-lbl').textContent = `${MONTHS[curMonth]} ${curYear}`;
+
+  /* Acumulado histórico: soma real de todos os meses */
+  let acumTotal = 0;
+  const allKeys = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k.startsWith('fin_20') || k.startsWith('fin_19')) allKeys.push(k);
+  }
+  allKeys.forEach(k => {
+    const l = getInvLancadosFromRaw(JSON.parse(localStorage.getItem(k)));
+    acumTotal += l.total;
+  });
+
+  /* Cards topo */
+  document.getElementById('invest-metrics').innerHTML = `
+    <div class="metric-card">
+      <div class="metric-card-label">Independência Financeira</div>
+      <div class="metric-card-val">${fmt(indep)}</div>
+      <div class="metric-card-sub">Lançado em ${MONTHS[curMonth]}</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-card-label">Reserva de Emergência</div>
+      <div class="metric-card-val">${fmt(emerg)}</div>
+      <div class="metric-card-sub">Lançado em ${MONTHS[curMonth]}</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-card-label">Aporte do mês</div>
+      <div class="metric-card-val">${fmt(total)}</div>
+      <div class="metric-card-sub">Soma dos dois</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-card-label">Acumulado total</div>
+      <div class="metric-card-val green">${fmt(acumTotal)}</div>
+      <div class="metric-card-sub">Todos os meses</div>
+    </div>
+  `;
+
+  renderInvAporteRows(indep, emerg, total);
+  renderInvClasses(classes, total);
+  renderInvPie(classes, total);
+  renderInvHistory();
+  renderInvSaldoClasses(classes, acumTotal);
+}
+
+function getInvLancadosFromRaw(md) {
+  const catIndep = md.cats.find(c => c.key === 'independencia');
+  const catEmerg = md.cats.find(c => c.key === 'emergencia');
+  const indep = catIndep ? catIndep.items.reduce((s, it) => s + (parseFloat(it.value)||0), 0) : 0;
+  const emerg = catEmerg ? catEmerg.items.reduce((s, it) => s + (parseFloat(it.value)||0), 0) : 0;
+  return { indep, emerg, total: indep + emerg };
+}
+
+function renderInvAporteRows(indep, emerg, total) {
+  const container = document.getElementById('inv-aporte-rows');
+  const md = loadMonth(curMonth, curYear);
+  const catIndep = md.cats.find(c => c.key === 'independencia');
+  const catEmerg = md.cats.find(c => c.key === 'emergencia');
+
+  function buildRows(cat, catLabel, dotColor) {
+    if (!cat || cat.items.length === 0) {
+      return `<div style="font-size:12px;color:var(--text3);padding:4px 0">Nenhum item lançado em <strong>${catLabel}</strong> neste mês.</div>`;
+    }
+    const subtotal = cat.items.reduce((s, it) => s + (parseFloat(it.value)||0), 0);
+    return `
+      <div style="margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">
+          <span style="width:7px;height:7px;border-radius:50%;background:${dotColor};flex-shrink:0"></span>
+          <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text2)">${catLabel}</span>
+          <span style="margin-left:auto;font-size:12px;font-weight:500">${fmt(subtotal)}</span>
+        </div>
+        ${cat.items.map(it => `
+          <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0 3px 14px;border-bottom:0.5px solid var(--border)">
+            <span style="color:var(--text2)">${it.name || '—'}</span>
+            <span style="font-weight:500">${fmt(it.value)}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  container.innerHTML =
+    buildRows(catIndep, 'Independência Financeira', '#1a1a18') +
+    '<div style="margin:8px 0;border-top:0.5px solid var(--border)"></div>' +
+    buildRows(catEmerg, 'Reserva de Emergência', '#888780') +
+    (total > 0 ? `<div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;margin-top:4px">
+      <span style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Total do mês</span>
+      <span style="font-size:15px;font-weight:500">${fmt(total)}</span>
+    </div>` : '');
+}
+
+function renderInvClasses(classes, aporte) {
+  const totalPct = classes.reduce((s, c) => s + (parseFloat(c.pct) || 0), 0);
+  const warn = document.getElementById('inv-pct-warning');
+  if (totalPct > 100.01) {
+    warn.style.display = 'block';
+    warn.innerHTML = `<div class="pct-warning">⚠ Porcentagens somam ${totalPct.toFixed(0)}% — acima de 100%</div>`;
+  } else { warn.style.display = 'none'; }
+  document.getElementById('inv-pct-lbl').textContent = `${totalPct.toFixed(0)}% alocados`;
+
+  const container = document.getElementById('inv-classes');
+  container.innerHTML = '';
+  classes.forEach((cls, ci) => {
+    const val = aporte * (parseFloat(cls.pct)||0) / 100;
+    const div = document.createElement('div');
+    div.className = 'category';
+    div.innerHTML = `
+      <div class="cat-header" style="cursor:default">
+        <span class="cat-dot" style="background:${cls.color}"></span>
+        <input class="item-name" type="text" value="${cls.label}" data-ci="${ci}" placeholder="Classe" style="font-size:12px;font-weight:500;max-width:150px">
+        <div class="cat-pct-wrap" style="margin-left:auto">
+          <input class="cat-pct-input" type="number" min="0" max="100" step="1" value="${cls.pct}" data-ci="${ci}">
+          <span class="cat-pct-sym">%</span>
+        </div>
+        <span class="cat-value">${fmt(val)}</span>
+        <button class="del-btn" data-ci="${ci}" title="Remover"><i class="ti ti-x"></i></button>
+      </div>
+    `;
+    div.querySelector('.item-name').addEventListener('input', e => {
+      classes[parseInt(e.target.dataset.ci)].label = e.target.value;
+      saveInvClasses(classes);
+      renderInvPie(classes, aporte);
+      renderInvSaldoClasses(classes, null);
+    });
+    div.querySelector('.cat-pct-input').addEventListener('change', e => {
+      classes[parseInt(e.target.dataset.ci)].pct = parseFloat(e.target.value) || 0;
+      saveInvClasses(classes);
+      renderInvest();
+    });
+    div.querySelector('.del-btn').addEventListener('click', () => {
+      classes.splice(ci, 1);
+      saveInvClasses(classes);
+      renderInvest();
+    });
+    container.appendChild(div);
+  });
+
+  const addWrap = document.createElement('div');
+  addWrap.style.cssText = 'padding:0.6rem 1.25rem;border-top:0.5px solid var(--border)';
+  addWrap.innerHTML = `<button class="add-item-btn" id="inv-add-class"><i class="ti ti-plus"></i> Adicionar classe</button>`;
+  container.appendChild(addWrap);
+  document.getElementById('inv-add-class').addEventListener('click', () => {
+    const palette = ['#2C2C2A','#5f5e5a','#888780','#b4b2a9','#d3d1c7','#444441'];
+    classes.push({ key: 'cls_' + Date.now(), label: 'Nova classe', pct: 0, color: palette[classes.length % palette.length] });
+    saveInvClasses(classes);
+    renderInvest();
+  });
+}
+
+function renderInvPie(classes, aporte) {
+  const vals = classes.map(c => aporte * (parseFloat(c.pct)||0) / 100);
+  const colors = classes.map(c => c.color);
+  const totalVal = vals.reduce((s, v) => s + v, 0);
+  document.getElementById('inv-chart-center').textContent = fmt(totalVal);
+
+  if (invPieChart) {
+    invPieChart.data.labels = classes.map(c => c.label);
+    invPieChart.data.datasets[0].data = vals;
+    invPieChart.data.datasets[0].backgroundColor = colors;
+    invPieChart.update();
+  } else {
+    invPieChart = new Chart(document.getElementById('invPieChart'), {
+      type: 'doughnut',
+      data: {
+        labels: classes.map(c => c.label),
+        datasets: [{ data: vals, backgroundColor: colors, borderColor: 'transparent', borderWidth: 0, hoverOffset: 4 }]
+      },
+      options: {
+        responsive: false, cutout: '62%',
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => `${fmt(ctx.raw)} (${aporte > 0 ? Math.round(ctx.raw/aporte*100) : 0}%)` } }
+        }
+      }
+    });
+  }
+
+  document.getElementById('inv-legend').innerHTML = classes.map((cls, ci) => `
+    <div class="leg-row">
+      <span class="leg-dot" style="background:${cls.color}"></span>
+      <span class="leg-name">${cls.label}</span>
+      <span class="leg-val">${fmt(vals[ci])}</span>
+      <span class="leg-pct">${parseFloat(cls.pct)||0}%</span>
+    </div>`).join('');
+}
+
+function renderInvHistory() {
+  const months = [];
+  let m = curMonth, y = curYear;
+  for (let i = 0; i < 12; i++) {
+    months.unshift({ m, y });
+    m--; if (m < 0) { m = 11; y--; }
+  }
+
+  let acum = 0;
+  const rows = months.map(({m, y}) => {
+    const { indep, emerg, total } = getInvLancados(m, y);
+    acum += total;
+    return { label: `${MONTHS[m].slice(0,3)}/${y}`, indep, emerg, total, acum };
+  }).filter(r => r.total > 0);
+
+  const tbody = document.getElementById('inv-history-body');
+  if (rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:1rem;font-size:12px">Lance valores nas categorias Independência Financeira e Reserva de Emergência na calculadora para ver o histórico aqui.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.label}</td>
+      <td class="num">${fmt(r.indep)}</td>
+      <td class="num">${fmt(r.emerg)}</td>
+      <td class="num">${fmt(r.total)}</td>
+      <td class="num green">${fmt(r.acum)}</td>
+    </tr>`).join('');
+}
+
+function renderInvSaldoClasses(classes, acumTotal) {
+  /* Se acumTotal não foi passado, recalcula */
+  if (acumTotal === null) {
+    acumTotal = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k.startsWith('fin_20') || k.startsWith('fin_19')) {
+        const l = getInvLancadosFromRaw(JSON.parse(localStorage.getItem(k)));
+        acumTotal += l.total;
+      }
+    }
+  }
+
+  const container = document.getElementById('inv-saldo-classes');
+  container.innerHTML = classes.map(cls => {
+    const pct2 = parseFloat(cls.pct) || 0;
+    const val = acumTotal * pct2 / 100;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border)">
+      <span style="width:7px;height:7px;border-radius:50%;background:${cls.color};flex-shrink:0"></span>
+      <span style="font-size:12px;color:var(--text2);flex:1">${cls.label}</span>
+      <span style="font-size:12px;font-weight:500">${fmt(val)}</span>
+      <span style="font-size:10px;color:var(--text3);min-width:28px;text-align:right">${pct2}%</span>
+    </div>`;
+  }).join('');
+
+  document.getElementById('inv-total-acum').textContent = fmt(acumTotal);
+}
 
 /* ── Init ── */
+const _now = new Date();
+curMonth = _now.getMonth();
+curYear  = _now.getFullYear();
 renderCalc();
 </script>
 </body>
