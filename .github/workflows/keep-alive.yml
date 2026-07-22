@@ -1,13 +1,20 @@
 name: Keep Supabase Alive
 
+# O plano gratuito do Supabase pausa projetos sem atividade de banco.
+# Este workflow faz uma consulta REAL ao banco todo dia, o que conta
+# como atividade. A chave usada é a publishable/anon — já é pública
+# no código do app (assets/js/supabase.js), então não há segredo aqui.
 on:
   schedule:
-    - cron: "0 12 * * 1,4"
+    - cron: "0 12 * * *" # todo dia às 12:00 UTC (09:00 em Brasília)
   workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase
-        run: curl -s ${{ secrets.SUPABASE_URL }} > /dev/null
+      - name: Consulta o banco (conta como atividade real)
+        run: |
+          curl -sf "https://oncqnmbuqhnhbcbatwkh.supabase.co/rest/v1/budget_months?select=id&limit=1" \
+            -H "apikey: sb_publishable_a5uTSYDhGhiyRuS60FspTA_DojIZORd" \
+            -H "Authorization: Bearer sb_publishable_a5uTSYDhGhiyRuS60FspTA_DojIZORd"
