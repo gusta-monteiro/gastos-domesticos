@@ -60,10 +60,19 @@
     }
   });
 
-  document.addEventListener("DOMContentLoaded", () => {
-    atualizarBotoes();
-    document.querySelectorAll(".theme-toggle").forEach((btn) => btn.addEventListener("click", alternar));
+  // Delegação de evento no document, registrada JÁ (este script roda antes
+  // do <body> existir) — não depende de esperar o botão aparecer no DOM nem
+  // do DOMContentLoaded, então não existe janela de tempo em que um clique
+  // no botão seja perdido, seja lá quão cedo o usuário clicar.
+  document.addEventListener("click", (e) => {
+    if (e.target.closest(".theme-toggle")) alternar();
   });
+
+  // Ícone/aria-label de cada botão só podem ser ajustados depois que ele
+  // existir no DOM — tenta já (no-op se ainda não existir) e de novo assim
+  // que o HTML terminar de carregar.
+  atualizarBotoes();
+  document.addEventListener("DOMContentLoaded", atualizarBotoes);
 
   window.temaEscuro = () => temaAtual() === "dark";
 })();
