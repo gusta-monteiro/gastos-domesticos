@@ -1421,6 +1421,97 @@ curYear  = _now.getFullYear();
   document.getElementById('next-month').disabled = false;
   renderCalc();
 });
+/* ══ SAÚDE FINANCEIRA (Fase D) ══ */
+/* Varre todo o histórico local e agrupa cada parcelamento (categoria +
+   nome normalizado) pela ocorrência mais RECENTE — é ali que mora o estado
+   de verdade da série (quantas parcelas já foram, quantas faltam). Uma
+   série some da lista assim que quita (para de ser carregada — Fase A),
+   então "ainda aparece aqui com atual<total" já É a definição de "em
+   aberto"; não precisa de nenhum estado adicional pra rastrear isso. */
+function calcularSaudeFinanceira() {
+  const series = new Map(); // "catKey|nome" -> { nome, item, y, m }
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    const info = key.match(/^fin_(\d{4})-(\d{2})$/);
+    if (!info) continue;
+    const y = +info[1], m = +info[2];
+    let md;
+    try { md = JSON.parse(localStorage.getItem(key)); } catch { continue; }
+    (md.cats || []).forEach(cat => {
+      if (!CATS_COM_PARCELA.has(cat.key)) return;
+      (cat.items || []).forEach(it => {
+        if (!it.parcela || !(it.parcela.total > 0)) return;
+        const chave = cat.key + '|' + recNorm(it.name);
+        const atual = series.get(chave);
+        if (!atual || y > atual.y || (y === atual.y && m > atual.m)) {
+          series.set(chave, { nome: it.name, item: it, y, m });
+        }
+      });
+    });
+  }
+
+  const ativos = [];
+  let dividaTotal = 0;
+  series.forEach(({ nome, item }) => {
+    const parcAtual = Number(item.parcela.atual) || 1;
+    const parcTotal = Number(item.parcela.total) || 1;
+    if (parcAtual >= parcTotal) return; // quitada, não conta mais
+    const valorParcela = parseFloat(item.value) || 0;
+    const valorRestante = valorParcela * (parcTotal - parcAtual + 1);
+    dividaTotal += valorRestante;
+    ativos.push({ nome, atual: parcAtual, total: parcTotal, valorRestante });
+  });
+  ativos.sort((a, b) => b.valorRestante - a.valorRestante);
+
+  return { dividaTotal, ativos, quitado: ativos.length === 0 };
+}
+
+function renderSaudeFinanceira() {
+  const container = document.getElementById('saude-financeira-body');
+  if (!container) return;
+  const saude = calcularSaudeFinanceira();
+
+  let perfil = null;
+  try { perfil = JSON.parse(localStorage.getItem('fin_perfil') || 'null'); } catch { /* ignora */ }
+  const eraSaindoDoVermelho = perfil && perfil.perfilKey === 'saindo_do_vermelho';
+
+  if (saude.quitado) {
+    container.innerHTML = `
+      <div class="saude-ok">Nenhuma dívida parcelada em aberto no momento.</div>
+      ${eraSaindoDoVermelho ? `
+        <div class="perfil-resultado" style="margin-top:0.75rem">
+          <div class="perfil-resultado-titulo">Parece que você quitou suas dívidas parceladas!</div>
+          <p style="font-size:12px;color:var(--text2)">Seu perfil ainda está marcado como "Saindo do Vermelho" — refaça a pergunta sobre dívida no questionário abaixo pra atualizar suas categorias.</p>
+          <button class="btn btn-primary" id="btn-atualizar-perfil-sem-divida">Refazer com "sem dívida"</button>
+        </div>
+      ` : ''}
+    `;
+    const btn = document.getElementById('btn-atualizar-perfil-sem-divida');
+    if (btn) btn.addEventListener('click', () => {
+      const semDivida = document.querySelector('input[name="q-temDivida"][value="false"]');
+      if (semDivida) {
+        semDivida.checked = true;
+        semDivida.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      document.getElementById('btn-calcular-perfil')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="saude-divida-total">
+      <span>Total em dívida (parcelas em aberto)</span>
+      <span class="pct">${fmt(saude.dividaTotal)}</span>
+    </div>
+    ${saude.ativos.map(a => `
+      <div class="perfil-resultado-cat-row">
+        <span class="nome">${esc(a.nome)} <span class="item-parcela-badge">${a.atual}/${a.total}</span></span>
+        <span class="pct">${fmt(a.valorRestante)}</span>
+      </div>
+    `).join('')}
+  `;
+}
+
 /* ══ PERFIL ══ */
 async function renderProfile() {
   const { data: { user } } = await db.auth.getUser();
@@ -1693,7 +1784,7 @@ document.getElementById('confirm-logout').addEventListener('click', async () => 
 const _navItems = document.querySelectorAll('.nav-item');
 _navItems.forEach(el => {
   el.addEventListener('click', () => {
-    if (el.dataset.page === 'profile') { renderProfile(); initPerfilForm(); }
+    if (el.dataset.page === 'profile') { renderProfile(); initPerfilForm(); renderSaudeFinanceira(); }
   });
 });
 

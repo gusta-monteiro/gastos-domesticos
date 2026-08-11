@@ -612,6 +612,27 @@
   padding-top: 0.5rem;
 }
 
+/* ── Saúde financeira ── */
+.saude-ok {
+  font-size: 12px;
+  color: var(--text2);
+  padding: 9px 12px;
+  background: var(--bg-success);
+  border: 0.5px solid var(--border-success);
+  border-radius: var(--radius);
+}
+.saude-divida-total {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  padding-bottom: 8px;
+  margin-bottom: 6px;
+  border-bottom: 0.5px solid var(--border);
+}
+.saude-divida-total .pct { color: var(--c-red); margin-left: auto; }
+
 .profile-msg {
   font-size: 12px;
   padding: 8px 12px;
