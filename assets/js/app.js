@@ -4,6 +4,9 @@ const CATS = [
   { key: 'variaveis',     label: 'Custos Variáveis',         pct: 20, color: '#888780' },
   { key: 'conforto',      label: 'Conforto',                 pct: 10, color: '#b4b2a9' },
   { key: 'emergencia',    label: 'Reserva de Emergência',    pct:  5, color: '#d3d1c7' },
+  // Sempre por último — todo código que casa CATS[ci] com md.cats[ci] por
+  // índice depende disso pra não desalinhar categorias antigas já salvas.
+  { key: 'meta',          label: 'Meta de Curto/Médio Prazo', pct:  0, color: '#a3824f' },
 ];
 // Parcelamento (item.parcela = {atual, total}) só faz sentido em gasto —
 // Independência/Reserva são aporte, não dívida.
@@ -47,6 +50,11 @@ function loadMonth(m, y) {
   // migração: meses antigos tinham só o número "renda"; viram uma entrada única
   if (!Array.isArray(d.rendas)) {
     d.rendas = (parseFloat(d.renda) > 0) ? [{ name: 'Renda', value: String(d.renda) }] : [];
+  }
+  // migração: meses antigos não tinham a categoria Meta — entra com 0% pra
+  // não mudar o rateio de ninguém, sempre no fim (ver comentário em CATS).
+  if (!d.cats.some(c => c.key === 'meta')) {
+    d.cats.push({ key: 'meta', pct: 0, items: [] });
   }
   return d;
 }
