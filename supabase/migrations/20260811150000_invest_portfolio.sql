@@ -21,10 +21,10 @@ begin
   where con.conrelid = 'public.invest_classes'::regclass
     and con.contype = 'u'
     and (
-      select array_agg(attname order by attname)
+      select array_agg(attname::text order by attname)
       from pg_attribute
       where attrelid = con.conrelid and attnum = any(con.conkey)
-    ) = array['key', 'user_id'];
+    ) = array['key', 'user_id']::text[];
 
   if cname is not null then
     execute format('alter table public.invest_classes drop constraint %I', cname);
