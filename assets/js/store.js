@@ -50,6 +50,9 @@
         renda: row.renda ? String(row.renda) : "",
         cats: (row.payload && row.payload.cats) || [],
       };
+      // rendas detalhadas só existem em meses gravados pela versão nova;
+      // sem elas, o loadMonth do app deriva uma entrada única do total.
+      if (row.payload && Array.isArray(row.payload.rendas)) value.rendas = row.payload.rendas;
       nativeSetItem(key, JSON.stringify(value));
     });
 
@@ -72,12 +75,18 @@
     if (!raw || !info) return;
     let obj;
     try { obj = JSON.parse(raw); } catch { return; }
+    // Meses de antes desta versão só tinham "renda" (um número), sem "rendas"
+    // (a lista). "rendas" ausente (Array.isArray === false) é migrado para uma
+    // entrada única; "rendas" já presente — mesmo vazio, [] — é respeitado como
+    // está, porque nesse caso [] é uma escolha real do usuário (apagou tudo).
+    const rendas = Array.isArray(obj.rendas) ? obj.rendas
+      : (parseFloat(obj.renda) > 0 ? [{ name: "Renda", value: String(obj.renda) }] : []);
     const { error } = await db.from("budget_months").upsert({
       user_id: userId,
       year: info.year,
       month: info.month,
       renda: parseFloat(obj.renda) || 0,
-      payload: { cats: obj.cats || [] },
+      payload: { cats: obj.cats || [], rendas },
       updated_at: new Date().toISOString(),
     }, { onConflict: "user_id,year,month" });
     if (error) throw error;

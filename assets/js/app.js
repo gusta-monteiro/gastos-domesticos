@@ -16,8 +16,16 @@ let pieRenda = 0; // renda do último render — o tooltip do gráfico lê daqui
 function mKey(m, y) { return `${y}-${String(m+1).padStart(2,'0')}`; }
 function loadMonth(m, y) {
   const raw = localStorage.getItem('fin_' + mKey(m, y));
-  if (raw) return JSON.parse(raw);
-  return { renda: '', cats: CATS.map(c => ({ key: c.key, pct: c.pct, items: [] })) };
+  const d = raw ? JSON.parse(raw)
+    : { renda: '', rendas: [], cats: CATS.map(c => ({ key: c.key, pct: c.pct, items: [] })) };
+  // migração: meses antigos tinham só o número "renda"; viram uma entrada única
+  if (!Array.isArray(d.rendas)) {
+    d.rendas = (parseFloat(d.renda) > 0) ? [{ name: 'Renda', value: String(d.renda) }] : [];
+  }
+  return d;
+}
+function totalRendas(md) {
+  return (md.rendas || []).reduce((s, r) => s + (parseFloat(r.value) || 0), 0);
 }
 function saveMonth(m, y, d) { localStorage.setItem('fin_' + mKey(m, y), JSON.stringify(d)); }
 function getApiKey() { return localStorage.getItem('fin_api_key') || ''; }
@@ -59,23 +67,77 @@ document.getElementById('next-month').addEventListener('click', () => {
   curMonth++; if (curMonth > 11) { curMonth = 0; curYear++; }
   renderCalc();
 });
-document.getElementById('renda').addEventListener('input', e => {
-  const md = loadMonth(curMonth, curYear);
-  md.renda = e.target.value;
-  saveMonth(curMonth, curYear, md);
-  renderCalc();
-});
 
 /* ══ CALCULADORA ══ */
 function renderCalc() {
   const md = loadMonth(curMonth, curYear);
   document.getElementById('month-label').textContent = `${MONTHS[curMonth]} ${curYear}`;
-  document.getElementById('renda').value = md.renda;
-  const renda = parseFloat(md.renda) || 0;
+  const renda = totalRendas(md);
+  md.renda = String(renda); // campo legado: Período/Relatório continuam lendo daqui
+  document.getElementById('renda-total').textContent = fmt(renda);
+  renderRendas(md);
   renderMetrics(md, renda);
   renderCategories(md, renda);
   renderPie(md, renda);
   renderRecorrentes();
+}
+
+function renderRendas(md) {
+  const container = document.getElementById('rendas');
+  document.getElementById('rendas-total-lbl').textContent = fmt(totalRendas(md));
+
+  container.innerHTML = `<div class="rendas-body">
+    ${md.rendas.map((r, i) => `
+      <div class="item-row">
+        <input class="item-name" type="text" placeholder="Ex.: Salário" value="${esc(r.name)}" data-i="${i}">
+        <input class="item-val" type="number" placeholder="0" min="0" value="${esc(r.value)}" data-i="${i}">
+        <button class="del-btn" data-i="${i}"><i class="ti ti-x"></i></button>
+      </div>`).join('')}
+    <button class="add-item-btn" id="add-renda-btn"><i class="ti ti-plus"></i> Adicionar renda</button>
+  </div>`;
+
+  const persistir = () => {
+    md.renda = String(totalRendas(md));
+    saveMonth(curMonth, curYear, md);
+  };
+  // atualiza os números sem reconstruir o cartão (preserva o foco de quem digita)
+  const atualizarValores = () => {
+    const renda = totalRendas(md);
+    document.getElementById('renda-total').textContent = fmt(renda);
+    document.getElementById('rendas-total-lbl').textContent = fmt(renda);
+    renderMetrics(md, renda);
+    renderCategories(md, renda);
+    renderPie(md, renda);
+  };
+
+  container.querySelectorAll('.item-name').forEach(inp => {
+    inp.addEventListener('input', e => {
+      md.rendas[parseInt(e.target.dataset.i)].name = e.target.value;
+      persistir();
+      renderRecorrentes(); // some da lista de sugestões o que o usuário acabou de digitar
+    });
+  });
+  container.querySelectorAll('.item-val').forEach(inp => {
+    inp.addEventListener('input', e => {
+      md.rendas[parseInt(e.target.dataset.i)].value = e.target.value;
+      persistir();
+      atualizarValores();
+    });
+  });
+  container.querySelectorAll('.del-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      md.rendas.splice(parseInt(btn.dataset.i), 1);
+      persistir();
+      renderCalc();
+    });
+  });
+  document.getElementById('add-renda-btn').addEventListener('click', () => {
+    md.rendas.push({ name: '', value: '' });
+    persistir();
+    renderCalc();
+    const nomes = document.querySelectorAll('#rendas .item-name');
+    if (nomes.length) nomes[nomes.length - 1].focus();
+  });
 }
 
 function renderMetrics(md, renda) {
@@ -170,6 +232,7 @@ function renderCategories(md, renda) {
       inp.addEventListener('input', e => {
         md.cats[parseInt(e.target.dataset.ci)].items[parseInt(e.target.dataset.ii)].name = e.target.value;
         saveMonth(curMonth, curYear, md);
+        renderRecorrentes(); // some da lista de sugestões o que o usuário acabou de digitar
       });
     });
     div.querySelectorAll('.item-val').forEach(inp => {
@@ -265,7 +328,9 @@ function renderRecorrentes() {
     ? detectarRecorrentes(curMonth, curYear) : [];
   if (!sugs.length) { panel.style.display = 'none'; panel.innerHTML = ''; return; }
 
-  const catDe = k => CATS.find(c => c.key === k) || { label: k, color: '#888780' };
+  const catDe = k => k === '__rendas'
+    ? { label: 'Renda', color: '#1a7a4a' }
+    : (CATS.find(c => c.key === k) || { label: k, color: '#888780' });
   panel.style.display = 'block';
   panel.innerHTML = `
     <div class="rec-card">
@@ -286,10 +351,23 @@ function renderRecorrentes() {
 
   const aplicar = (lista) => {
     const md = loadMonth(curMonth, curYear);
+    // Trava contra duplicata: o painel pode estar desatualizado (ex.: o usuário
+    // digitou manualmente algo que já estava sugerido) — reconferimos aqui,
+    // com os dados frescos do mês, antes de adicionar cada item.
     lista.forEach(s => {
-      const cat = md.cats.find(c => c.key === s.catKey);
-      if (cat) cat.items.push({ name: s.name, value: String(s.value) });
+      if (s.catKey === '__rendas') {
+        const jaLancado = md.rendas.some(r => recNorm(r.name) === recNorm(s.name));
+        if (jaLancado) return;
+        md.rendas.push({ name: s.name, value: String(s.value) });
+      } else {
+        const cat = md.cats.find(c => c.key === s.catKey);
+        if (!cat) return;
+        const jaLancado = cat.items.some(it => recNorm(it.name) === recNorm(s.name));
+        if (jaLancado) return;
+        cat.items.push({ name: s.name, value: String(s.value) });
+      }
     });
+    md.renda = String(totalRendas(md));
     saveMonth(curMonth, curYear, md);
     renderCalc();
   };

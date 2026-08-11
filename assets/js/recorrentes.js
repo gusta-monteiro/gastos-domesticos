@@ -64,6 +64,26 @@ function recTipoConhecido(nome) {
   return null;
 }
 
+/* Rendas sabidamente recorrentes MÊS A MÊS — basta 1 mês para sugerir no
+   seguinte. Bônus anuais (13º, PLR) ficam de fora de propósito: sugeri-los
+   logo depois de dezembro inflaria a renda de janeiro/fevereiro. */
+const REC_RENDAS = [
+  'salario', 'pagamento', 'pro labore', 'pro-labore', 'prolabore',
+  'freela', 'freelance', 'rendimento', 'pensao', 'aposentadoria',
+  'bolsa', 'vale', 'comissao',
+];
+/* Bônus anuais/irregulares: verificados ANTES da lista acima, porque um nome
+   como "13º salário" contém a palavra "salário" e casaria por engano. */
+const REC_RENDAS_EXCLUSAO = [
+  '13', 'decimo terceiro', 'plr', 'participacao nos lucros', 'gratificacao natalina',
+];
+function recRendaConhecida(nome) {
+  const n = recNorm(nome);
+  if (!n) return false;
+  if (REC_RENDAS_EXCLUSAO.some(t => n.includes(t))) return false;
+  return REC_RENDAS.some(t => n.includes(t));
+}
+
 /* Varre os 3 meses anteriores a (m, y) e devolve sugestões que ainda não
    existem no mês atual: [{ catKey, name, value, tipo, meses }] */
 function detectarRecorrentes(m, y) {
@@ -72,27 +92,34 @@ function detectarRecorrentes(m, y) {
   for (let i = 1; i <= 3; i++) {
     mm--; if (mm < 0) { mm = 11; yy--; }
     const md = loadMonth(mm, yy);
-    md.cats.forEach(c => c.items.forEach(it => {
+    const registrar = (catKey, it) => {
       const nn = recNorm(it.name);
       const val = parseFloat(it.value);
       if (!nn || !(val > 0)) return;
-      const k = c.key + '|' + nn;
+      const k = catKey + '|' + nn;
       if (!hist.has(k)) {
         // i=1 é o mês mais recente, então o primeiro registro traz o valor mais atual
-        hist.set(k, { name: it.name, catKey: c.key, meses: 0, valorRecente: val, maisRecente: i });
+        hist.set(k, { name: it.name, catKey, meses: 0, valorRecente: val, maisRecente: i });
       }
       hist.get(k).meses++;
-    }));
+    };
+    md.cats.forEach(c => c.items.forEach(it => registrar(c.key, it)));
+    (md.rendas || []).forEach(it => registrar('__rendas', it));
   }
 
   const atuais = new Set();
-  loadMonth(m, y).cats.forEach(c =>
+  const atual = loadMonth(m, y);
+  atual.cats.forEach(c =>
     c.items.forEach(it => atuais.add(c.key + '|' + recNorm(it.name))));
+  (atual.rendas || []).forEach(it => atuais.add('__rendas|' + recNorm(it.name)));
 
   const sugestoes = [];
   hist.forEach((h, k) => {
     if (atuais.has(k)) return;
-    const tipo = recTipoConhecido(h.name);
+    const ehRenda = h.catKey === '__rendas';
+    const tipo = ehRenda
+      ? (recRendaConhecida(h.name) ? 'renda' : null)
+      : recTipoConhecido(h.name);
     const recorrentePorHistorico = h.meses >= 2;
     const recorrentePorConhecimento = tipo !== null && h.maisRecente <= 2;
     if (recorrentePorHistorico || recorrentePorConhecimento) {

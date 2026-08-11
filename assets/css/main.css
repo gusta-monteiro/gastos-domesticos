@@ -458,6 +458,11 @@
   .profile-grid { grid-template-columns: 1fr; }
 }
 
+/* ── Rendas do mês ── */
+.calc-col { display: flex; flex-direction: column; gap: 1.5rem; }
+.renda-total { font-size: 14px; font-weight: 500; color: var(--text); }
+.rendas-body { padding: 0.75rem 1.25rem; }
+
 /* ── Meta (objetivo) ao lado do valor lançado na categoria ── */
 .cat-value-meta { font-size: 11px; font-weight: 400; color: var(--text3); }
 .leg-meta { font-size: 9px; color: var(--text3); min-width: 52px; text-align: right; }

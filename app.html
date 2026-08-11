@@ -41,9 +41,8 @@
         </div>
       </div>
       <div class="renda-wrap">
-        <label>Renda</label>
-        <span class="renda-prefix">R$</span>
-        <input type="number" id="renda" placeholder="0" min="0" step="100">
+        <label>Renda do mês</label>
+        <span class="renda-total" id="renda-total">R$ 0,00</span>
       </div>
     </div>
 
@@ -52,13 +51,22 @@
       <div class="metric-grid" id="metric-grid"></div>
       <div id="recorrentes-panel" style="display:none"></div>
       <div class="calc-grid">
-        <div class="card">
-          <div class="card-header">
-            <span>Categorias</span>
-            <span id="pct-total-lbl" style="font-size:11px"></span>
+        <div class="calc-col">
+          <div class="card">
+            <div class="card-header">
+              <span>Rendas do mês</span>
+              <span id="rendas-total-lbl" style="font-size:11px"></span>
+            </div>
+            <div id="rendas"></div>
           </div>
-          <div id="pct-warning" style="display:none"></div>
-          <div id="categories"></div>
+          <div class="card">
+            <div class="card-header">
+              <span>Categorias</span>
+              <span id="pct-total-lbl" style="font-size:11px"></span>
+            </div>
+            <div id="pct-warning" style="display:none"></div>
+            <div id="categories"></div>
+          </div>
         </div>
         <div class="card">
           <div class="card-header"><span>Distribuição</span></div>
