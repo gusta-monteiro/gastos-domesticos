@@ -617,20 +617,28 @@ function gerarParecer(months) {
 
 /* ══ INVESTIMENTOS ══ */
 const INV_CLASSES_DEFAULT = [
-  { key: 'renda_fixa', label: 'Renda Fixa',    pct: 40, color: '#1a1a18' },
-  { key: 'acoes',      label: 'Ações',          pct: 30, color: '#5f5e5a' },
-  { key: 'fii',        label: 'FII',            pct: 20, color: '#888780' },
-  { key: 'exterior',   label: 'Internacional',  pct: 10, color: '#b4b2a9' },
+  { key: 'renda_fixa', label: 'Renda Fixa',    pct: 40, color: '#1a1a18', aa: 0.11 },
+  { key: 'acoes',      label: 'Ações',          pct: 30, color: '#5f5e5a', aa: 0.12 },
+  { key: 'fii',        label: 'FII',            pct: 20, color: '#888780', aa: 0.10 },
+  { key: 'exterior',   label: 'Internacional',  pct: 10, color: '#b4b2a9', aa: 0.08 },
 ];
+/* Reserva de Emergência é liquidez, não uma classe de risco: fica de fora
+   do rateio por % das outras e recebe 100% do que for lançado em
+   "emergencia" — nunca dividida entre Renda Fixa/Ações/etc. */
+const RESERVA_KEY = 'reserva_emergencia';
+const RESERVA_DEFAULT = { key: RESERVA_KEY, label: 'Reserva de Emergência', pct: 0, color: '#2f6f62', aa: 0.1025 };
 
 let invPieChart = null;
 let invAporteAtual = 0; // aporte do último render — o tooltip lê daqui
 
 function loadInvClasses() {
   const raw = localStorage.getItem('fin_inv_classes');
-  return raw ? JSON.parse(raw) : INV_CLASSES_DEFAULT.map(c => ({ ...c }));
+  if (raw) return JSON.parse(raw);
+  return [...INV_CLASSES_DEFAULT.map(c => ({ ...c })), { ...RESERVA_DEFAULT }];
 }
 function saveInvClasses(cls) { localStorage.setItem('fin_inv_classes', JSON.stringify(cls)); }
+function classesDeInvestimento(todas) { return todas.filter(c => c.key !== RESERVA_KEY); }
+function classeReserva(todas) { return todas.find(c => c.key === RESERVA_KEY); }
 
 /* Pega os valores LANÇADOS nos itens de independencia e emergencia do mês */
 function getInvLancados(m, y) {
@@ -643,13 +651,28 @@ function getInvLancados(m, y) {
 }
 
 function renderInvest() {
-  const classes = loadInvClasses();
+  // Classes padrão só existem "na memória" até serem salvas — sem isso, o
+  // motor de rendimento nunca teria onde escrever o aporte do mês. Persiste
+  // na primeira visita à aba, uma única vez (não sobrescreve o que já existe).
+  if (!localStorage.getItem('fin_inv_classes')) saveInvClasses(loadInvClasses());
+  // Toda visita a esta aba também garante que o mês real de hoje está
+  // sincronizado e preenche qualquer mês antigo sem registro no ledger —
+  // sem nunca reescrever um mês que já tem ledger gravado (ver store.js).
+  if (window.store && window.store.garantirLedgerCompleto) {
+    window.store.garantirLedgerCompleto()
+      .catch(err => console.error('[invest] erro ao sincronizar aportes', err));
+  }
+
+  const todasClasses = loadInvClasses();
+  const classes = classesDeInvestimento(todasClasses);
+  const reserva = classeReserva(todasClasses);
   const { indep, emerg, total } = getInvLancados(curMonth, curYear);
 
   document.getElementById('inv-month-lbl').textContent = `${MONTHS[curMonth]} ${curYear}`;
 
-  /* Acumulado histórico: soma real de todos os meses */
-  let acumTotal = 0;
+  /* Acumulado histórico: soma real de todos os meses, já separado por destino
+     — Independência alimenta as classes de investimento, Emergência é caixa. */
+  let acumIndep = 0, acumEmerg = 0;
   const allKeys = [];
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
@@ -657,8 +680,10 @@ function renderInvest() {
   }
   allKeys.forEach(k => {
     const l = getInvLancadosFromRaw(JSON.parse(localStorage.getItem(k)));
-    acumTotal += l.total;
+    acumIndep += l.indep;
+    acumEmerg += l.emerg;
   });
+  const acumTotal = acumIndep + acumEmerg;
 
   /* Cards topo */
   document.getElementById('invest-metrics').innerHTML = `
@@ -685,10 +710,11 @@ function renderInvest() {
   `;
 
   renderInvAporteRows(indep, emerg, total);
-  renderInvClasses(classes, total);
-  renderInvPie(classes, total);
+  renderInvClasses(todasClasses, indep);
+  renderInvPie(classes, indep);
   renderInvHistory();
-  renderInvSaldoClasses(classes, acumTotal);
+  renderInvSaldoClasses(classes, acumIndep);
+  renderReserva(todasClasses, emerg, acumEmerg);
 }
 
 function getInvLancadosFromRaw(md) {
@@ -737,7 +763,29 @@ function renderInvAporteRows(indep, emerg, total) {
     </div>` : '');
 }
 
-function renderInvClasses(classes, aporte) {
+/* Um input de "saldo real" que salva na nuvem ao perder o foco, com um
+   pequeno retorno visual — reaproveitado pelas classes e pela reserva. */
+function ligarSaldoReal(container, classKey) {
+  const input = container.querySelector('.inv-saldo-real-input');
+  const msg = container.querySelector('.inv-saldo-real-msg');
+  input.addEventListener('change', async e => {
+    const valor = parseFloat(e.target.value);
+    if (!(valor >= 0)) { msg.textContent = ''; return; }
+    msg.textContent = 'Salvando...';
+    msg.className = 'inv-saldo-real-msg';
+    try {
+      await window.store.salvarSaldoReal(classKey, valor);
+      msg.textContent = 'Salvo ✓';
+      msg.className = 'inv-saldo-real-msg ok';
+    } catch (err) {
+      msg.textContent = 'Erro ao salvar — tente de novo';
+      msg.className = 'inv-saldo-real-msg erro';
+    }
+  });
+}
+
+function renderInvClasses(todasClasses, aporte) {
+  const classes = classesDeInvestimento(todasClasses);
   const totalPct = classes.reduce((s, c) => s + (parseFloat(c.pct) || 0), 0);
   const warn = document.getElementById('inv-pct-warning');
   if (totalPct > 100.01) {
@@ -748,38 +796,60 @@ function renderInvClasses(classes, aporte) {
 
   const container = document.getElementById('inv-classes');
   container.innerHTML = '';
-  classes.forEach((cls, ci) => {
-    const val = aporte * (parseFloat(cls.pct)||0) / 100;
+  classes.forEach(cls => {
+    // Rateia pela soma real das % (totalPct), não por 100 fixo — o aviso
+    // acima é só um alerta, nunca impediu o usuário de salvar acima/abaixo
+    // de 100%, então o valor exibido precisa bater com o que é gravado.
+    const val = totalPct > 0 ? aporte * (parseFloat(cls.pct)||0) / totalPct : 0;
+    const aaPct = ((parseFloat(cls.aa)||0) * 100).toFixed(2);
     const div = document.createElement('div');
     div.className = 'category';
     div.innerHTML = `
       <div class="cat-header" style="cursor:default">
         <span class="cat-dot" style="background:${cls.color}"></span>
-        <input class="item-name" type="text" value="${esc(cls.label)}" data-ci="${ci}" placeholder="Classe" style="font-size:12px;font-weight:500;max-width:150px">
+        <input class="item-name" type="text" value="${esc(cls.label)}" placeholder="Classe" style="font-size:12px;font-weight:500;max-width:130px">
         <div class="cat-pct-wrap" style="margin-left:auto">
-          <input class="cat-pct-input" type="number" min="0" max="100" step="1" value="${cls.pct}" data-ci="${ci}">
+          <input class="cat-pct-input" type="number" min="0" max="100" step="1" value="${cls.pct}">
           <span class="cat-pct-sym">%</span>
         </div>
         <span class="cat-value">${fmt(val)}</span>
-        <button class="del-btn" data-ci="${ci}" title="Remover"><i class="ti ti-x"></i></button>
+        <button class="del-btn" title="Remover"><i class="ti ti-x"></i></button>
+      </div>
+      <div class="inv-class-extra">
+        <label>Taxa esperada<input class="inv-aa-input" type="number" step="0.1" value="${aaPct}"> % a.a.</label>
+        <label>Saldo real<input class="inv-saldo-real-input" type="number" min="0" step="0.01" placeholder="Opcional"></label>
+        <span class="inv-saldo-real-msg"></span>
       </div>
     `;
     div.querySelector('.item-name').addEventListener('input', e => {
-      classes[parseInt(e.target.dataset.ci)].label = e.target.value;
-      saveInvClasses(classes);
+      cls.label = e.target.value;
+      saveInvClasses(todasClasses);
       renderInvPie(classes, aporte);
       renderInvSaldoClasses(classes, null);
     });
     div.querySelector('.cat-pct-input').addEventListener('change', e => {
-      classes[parseInt(e.target.dataset.ci)].pct = parseFloat(e.target.value) || 0;
-      saveInvClasses(classes);
+      cls.pct = parseFloat(e.target.value) || 0;
+      saveInvClasses(todasClasses);
       renderInvest();
+    });
+    div.querySelector('.inv-aa-input').addEventListener('change', e => {
+      cls.aa = (parseFloat(e.target.value) || 0) / 100;
+      saveInvClasses(todasClasses);
     });
     div.querySelector('.del-btn').addEventListener('click', () => {
-      classes.splice(ci, 1);
-      saveInvClasses(classes);
+      // Sem nenhuma classe de investimento, o aporte de Independência
+      // ficaria sem destino nenhum — mantém sempre pelo menos uma.
+      if (classes.length <= 1) {
+        warn.style.display = 'block';
+        warn.innerHTML = `<div class="pct-warning">⚠ Mantenha pelo menos uma classe de investimento</div>`;
+        return;
+      }
+      const idx = todasClasses.findIndex(c => c.key === cls.key);
+      if (idx >= 0) todasClasses.splice(idx, 1);
+      saveInvClasses(todasClasses);
       renderInvest();
     });
+    ligarSaldoReal(div, cls.key);
     container.appendChild(div);
   });
 
@@ -789,15 +859,51 @@ function renderInvClasses(classes, aporte) {
   container.appendChild(addWrap);
   document.getElementById('inv-add-class').addEventListener('click', () => {
     const palette = ['#2C2C2A','#5f5e5a','#888780','#b4b2a9','#d3d1c7','#444441'];
-    classes.push({ key: 'cls_' + Date.now(), label: 'Nova classe', pct: 0, color: palette[classes.length % palette.length] });
-    saveInvClasses(classes);
+    todasClasses.push({ key: 'cls_' + Date.now(), label: 'Nova classe', pct: 0, color: palette[classes.length % palette.length], aa: 0 });
+    saveInvClasses(todasClasses);
     renderInvest();
   });
 }
 
+/* Reserva de Emergência: card separado, sem % de rateio — recebe 100% do
+   que for lançado em "emergencia" e tem sua própria taxa esperada. */
+function renderReserva(todasClasses, aporteMes, acumEmerg) {
+  const container = document.getElementById('inv-reserva');
+  if (!container) return;
+  const reserva = classeReserva(todasClasses);
+  if (!reserva) { container.innerHTML = ''; return; }
+  const aaPct = ((parseFloat(reserva.aa)||0) * 100).toFixed(2);
+
+  container.innerHTML = `
+    <div class="reserva-row">
+      <div>
+        <div class="reserva-label">Aporte deste mês</div>
+        <div class="reserva-val">${fmt(aporteMes)}</div>
+      </div>
+      <div>
+        <div class="reserva-label">Acumulado</div>
+        <div class="reserva-val green">${fmt(acumEmerg)}</div>
+      </div>
+    </div>
+    <div class="inv-class-extra">
+      <label>Taxa esperada<input class="inv-aa-input" type="number" step="0.1" value="${aaPct}"> % a.a.</label>
+      <label>Saldo real<input class="inv-saldo-real-input" type="number" min="0" step="0.01" placeholder="Opcional"></label>
+      <span class="inv-saldo-real-msg"></span>
+    </div>
+  `;
+  container.querySelector('.inv-aa-input').addEventListener('change', e => {
+    reserva.aa = (parseFloat(e.target.value) || 0) / 100;
+    saveInvClasses(todasClasses);
+  });
+  ligarSaldoReal(container, reserva.key);
+}
+
 function renderInvPie(classes, aporte) {
   invAporteAtual = aporte;
-  const vals = classes.map(c => aporte * (parseFloat(c.pct)||0) / 100);
+  // Rateia pela soma real das % — assim o centro do gráfico sempre bate com
+  // o aporte de verdade, mesmo se as % configuradas não somarem 100%.
+  const somaPct = classes.reduce((s, c) => s + (parseFloat(c.pct) || 0), 0);
+  const vals = classes.map(c => somaPct > 0 ? aporte * (parseFloat(c.pct)||0) / somaPct : 0);
   const colors = classes.map(c => c.color);
   const totalVal = vals.reduce((s, v) => s + v, 0);
   document.getElementById('inv-chart-center').textContent = fmt(totalVal);
@@ -864,22 +970,27 @@ function renderInvHistory() {
 }
 
 function renderInvSaldoClasses(classes, acumTotal) {
-  /* Se acumTotal não foi passado, recalcula */
+  /* Se acumTotal não foi passado, recalcula só a partir da Independência —
+     a Reserva de Emergência não participa do rateio das classes de
+     investimento, tem seu próprio card. */
   if (acumTotal === null) {
     acumTotal = 0;
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
       if (k.startsWith('fin_20') || k.startsWith('fin_19')) {
         const l = getInvLancadosFromRaw(JSON.parse(localStorage.getItem(k)));
-        acumTotal += l.total;
+        acumTotal += l.indep;
       }
     }
   }
 
+  // Rateia pela soma real das % (não por 100 fixo) para bater com o que é
+  // gravado no banco mesmo quando as % não somam exatamente 100%.
+  const somaPct = classes.reduce((s, c) => s + (parseFloat(c.pct) || 0), 0);
   const container = document.getElementById('inv-saldo-classes');
   container.innerHTML = classes.map(cls => {
     const pct2 = parseFloat(cls.pct) || 0;
-    const val = acumTotal * pct2 / 100;
+    const val = somaPct > 0 ? acumTotal * pct2 / somaPct : 0;
     return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border)">
       <span style="width:7px;height:7px;border-radius:50%;background:${cls.color};flex-shrink:0"></span>
       <span style="font-size:12px;color:var(--text2);flex:1">${esc(cls.label)}</span>
