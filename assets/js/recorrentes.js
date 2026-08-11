@@ -93,6 +93,11 @@ function detectarRecorrentes(m, y) {
     mm--; if (mm < 0) { mm = 11; yy--; }
     const md = loadMonth(mm, yy);
     const registrar = (catKey, it) => {
+      // Parcelado tem rastreio próprio (garantirParcelasDoMes, em app.js) que já
+      // carrega a parcela seguinte sozinho — ou já terminou (atual==total) e não
+      // deve voltar. De qualquer forma, nunca é candidato a "recorrente" aqui,
+      // senão uma dívida já quitada reaparece como sugestão de novo lançamento.
+      if (it.parcela) return;
       const nn = recNorm(it.name);
       const val = parseFloat(it.value);
       if (!nn || !(val > 0)) return;

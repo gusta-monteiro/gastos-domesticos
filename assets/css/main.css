@@ -246,8 +246,31 @@
     text-align: right; color: var(--text); background: transparent;
   }
   .item-name:focus, .item-val:focus { outline: none; border-bottom-color: var(--text2); }
+  .item-block { margin-bottom: 5px; }
+  .item-block .item-row { margin-bottom: 0; }
+  .item-parcela-badge {
+    font-size: 9px; color: var(--text3); flex-shrink: 0;
+    background: var(--bg2); border: 0.5px solid var(--border);
+    border-radius: 20px; padding: 1px 6px; white-space: nowrap;
+  }
+  .item-parcela-toggle {
+    background: none; border: none; cursor: pointer; flex-shrink: 0;
+    color: var(--text3); font-size: 14px; padding: 0 2px; line-height: 1;
+  }
+  .item-parcela-toggle:hover { color: var(--text2); }
+  .item-parcela-toggle.active { color: var(--c-green); }
+  .item-parcela-row {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 10px; color: var(--text3); padding: 2px 0;
+  }
+  .item-parcela-row input {
+    width: 36px; border: none; border-bottom: 0.5px solid var(--border);
+    padding: 2px 0; font-size: 11px; font-family: 'Inter', sans-serif;
+    text-align: center; color: var(--text); background: transparent;
+  }
+  .item-parcela-row input:focus { outline: none; border-bottom-color: var(--text2); }
   .del-btn {
-    background: none; border: none; cursor: pointer;
+    background: none; border: none; cursor: pointer; flex-shrink: 0;
     color: var(--text3); font-size: 14px; padding: 0 2px; line-height: 1;
   }
   .del-btn:hover { color: var(--text2); }

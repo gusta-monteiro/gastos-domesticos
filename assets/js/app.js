@@ -5,6 +5,9 @@ const CATS = [
   { key: 'conforto',      label: 'Conforto',                 pct: 10, color: '#b4b2a9' },
   { key: 'emergencia',    label: 'Reserva de Emergência',    pct:  5, color: '#d3d1c7' },
 ];
+// Parcelamento (item.parcela = {atual, total}) só faz sentido em gasto —
+// Independência/Reserva são aporte, não dívida.
+const CATS_COM_PARCELA = new Set(['fixos', 'variaveis']);
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
 let curMonth = new Date().getMonth();
@@ -49,6 +52,42 @@ function loadMonth(m, y) {
 }
 function totalRendas(md) {
   return (md.rendas || []).reduce((s, r) => s + (parseFloat(r.value) || 0), 0);
+}
+
+/* Ao abrir um mês pela 1ª vez (nunca salvo), copia pra ele os itens
+   parcelados do último mês salvo anteriormente (não necessariamente o mês
+   imediatamente anterior — se o app ficar sem ser aberto por um tempo,
+   procura pra trás até achar onde a trilha parou) que ainda não
+   terminaram, já com a parcela seguinte — só chamada pela navegação real
+   da Calculadora (renderCalc), nunca durante leituras de histórico
+   (Período/Relatório/recorrentes.js), senão criaria e gravaria meses
+   "fantasma" só de estarem sendo varridos. */
+function garantirParcelasDoMes(m, y) {
+  const key = 'fin_' + mKey(m, y);
+  if (localStorage.getItem(key)) return; // já existe, nada a fazer
+
+  let mm = m, yy = y, anterior = null;
+  for (let i = 0; i < 36; i++) { // limite generoso: 3 anos sem abrir o app
+    mm--; if (mm < 0) { mm = 11; yy--; }
+    const raw = localStorage.getItem('fin_' + mKey(mm, yy));
+    if (raw) { try { anterior = JSON.parse(raw); } catch { anterior = null; } break; }
+  }
+  if (!anterior) return;
+
+  const d = loadMonth(m, y);
+  let mudou = false;
+  for (const catKey of CATS_COM_PARCELA) {
+    const catAnterior = (anterior.cats || []).find(c => c.key === catKey);
+    const cat = d.cats.find(c => c.key === catKey);
+    if (!catAnterior || !cat) continue;
+    for (const it of (catAnterior.items || [])) {
+      if (it && it.parcela && it.parcela.total > 0 && it.parcela.atual < it.parcela.total) {
+        cat.items.push({ name: it.name, value: it.value, parcela: { atual: Number(it.parcela.atual) + 1, total: it.parcela.total } });
+        mudou = true;
+      }
+    }
+  }
+  if (mudou) saveMonth(m, y, d);
 }
 function saveMonth(m, y, d) { localStorage.setItem('fin_' + mKey(m, y), JSON.stringify(d)); }
 function getApiKey() { return localStorage.getItem('fin_api_key') || ''; }
@@ -106,6 +145,7 @@ document.getElementById('next-month').addEventListener('click', () => {
 
 /* ══ CALCULADORA ══ */
 function renderCalc() {
+  garantirParcelasDoMes(curMonth, curYear);
   const md = loadMonth(curMonth, curYear);
   document.getElementById('month-label').textContent = `${MONTHS[curMonth]} ${curYear}`;
   const renda = totalRendas(md);
@@ -234,13 +274,31 @@ function renderCategories(md, renda) {
         <i class="ti ti-chevron-down cat-toggle ${isOpen ? 'open' : ''}"></i>
       </div>
       <div class="cat-items ${isOpen ? 'open' : ''}">
-        ${cat.items.map((it, ii) => `
-          <div class="item-row">
-            <input class="item-name" type="text" placeholder="Descrição" value="${esc(it.name)}" data-ci="${ci}" data-ii="${ii}">
-            <input class="item-val" type="number" placeholder="0" min="0" value="${it.value||''}" data-ci="${ci}" data-ii="${ii}">
-            <button class="del-btn" data-ci="${ci}" data-ii="${ii}"><i class="ti ti-x"></i></button>
+        ${cat.items.map((it, ii) => {
+          const temParcela = it.parcela && it.parcela.total > 0;
+          // Number(...)||1 blinda contra dado corrompido/editado fora do app
+          // (ex: direto no Supabase) — nunca interpola texto arbitrário aqui.
+          const pAtual = temParcela ? (Number(it.parcela.atual) || 1) : 1;
+          const pTotal = temParcela ? (Number(it.parcela.total) || 1) : 1;
+          return `
+          <div class="item-block">
+            <div class="item-row">
+              <input class="item-name" type="text" placeholder="Descrição" value="${esc(it.name)}" data-ci="${ci}" data-ii="${ii}">
+              ${temParcela ? `<span class="item-parcela-badge">${pAtual}/${pTotal}</span>` : ''}
+              <input class="item-val" type="number" placeholder="0" min="0" value="${it.value||''}" data-ci="${ci}" data-ii="${ii}">
+              ${CATS_COM_PARCELA.has(def.key) ? `<button class="item-parcela-toggle ${temParcela ? 'active' : ''}" data-ci="${ci}" data-ii="${ii}" title="É parcelado?"><i class="ti ti-calendar"></i></button>` : ''}
+              <button class="del-btn" data-ci="${ci}" data-ii="${ii}"><i class="ti ti-x"></i></button>
+            </div>
+            ${temParcela ? `
+              <div class="item-parcela-row">
+                <span>Parcela</span>
+                <input class="item-parcela-atual" type="number" min="1" value="${pAtual}" data-ci="${ci}" data-ii="${ii}">
+                <span>de</span>
+                <input class="item-parcela-total" type="number" min="1" value="${pTotal}" data-ci="${ci}" data-ii="${ii}">
+              </div>
+            ` : ''}
           </div>
-        `).join('')}
+        `;}).join('')}
         <button class="add-item-btn" data-ci="${ci}"><i class="ti ti-plus"></i> Adicionar item</button>
         ${lancado > 0 ? `<div class="cat-summary">Lançado: ${fmt(lancado)} / ${fmt(alocado)} (${pct(lancado,alocado)}%)</div>` : ''}
       </div>
@@ -282,6 +340,31 @@ function renderCategories(md, renda) {
     div.querySelectorAll('.del-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         md.cats[parseInt(btn.dataset.ci)].items.splice(parseInt(btn.dataset.ii), 1);
+        saveMonth(curMonth, curYear, md);
+        renderCalc();
+      });
+    });
+    div.querySelectorAll('.item-parcela-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const it = md.cats[parseInt(btn.dataset.ci)].items[parseInt(btn.dataset.ii)];
+        if (it.parcela) delete it.parcela;
+        else it.parcela = { atual: 1, total: 2 };
+        saveMonth(curMonth, curYear, md);
+        renderCalc();
+      });
+    });
+    div.querySelectorAll('.item-parcela-atual').forEach(inp => {
+      inp.addEventListener('change', e => {
+        const it = md.cats[parseInt(e.target.dataset.ci)].items[parseInt(e.target.dataset.ii)];
+        it.parcela.atual = Math.max(1, parseInt(e.target.value) || 1);
+        saveMonth(curMonth, curYear, md);
+        renderCalc();
+      });
+    });
+    div.querySelectorAll('.item-parcela-total').forEach(inp => {
+      inp.addEventListener('change', e => {
+        const it = md.cats[parseInt(e.target.dataset.ci)].items[parseInt(e.target.dataset.ii)];
+        it.parcela.total = Math.max(1, parseInt(e.target.value) || 1);
         saveMonth(curMonth, curYear, md);
         renderCalc();
       });
