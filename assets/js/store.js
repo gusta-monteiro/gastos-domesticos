@@ -343,5 +343,22 @@
     }
   }
 
-  window.store = { ready: init(), salvarSaldoReal, garantirLedgerCompleto };
+  /* Dados brutos para o motor de rendimento (motor.js) calcular o patrimônio
+     real: TODAS as classes (inclusive arquivadas — dinheiro antigo nelas
+     continua contando no patrimônio total) + todo o histórico do ledger. */
+  async function buscarLedgerCompleto() {
+    const [{ data: classes, error: e1 }, { data: ledger, error: e2 }] = await Promise.all([
+      db.from("invest_classes")
+        .select("id, key, label, target_pct, color, expected_return_aa, archived")
+        .eq("user_id", userId),
+      db.from("invest_ledger")
+        .select("class_id, year, month, aporte, saldo_real")
+        .eq("user_id", userId),
+    ]);
+    if (e1) throw e1;
+    if (e2) throw e2;
+    return { classes: classes || [], ledger: ledger || [] };
+  }
+
+  window.store = { ready: init(), salvarSaldoReal, garantirLedgerCompleto, buscarLedgerCompleto };
 })();

@@ -650,18 +650,114 @@ function getInvLancados(m, y) {
   return { indep, emerg, total: indep + emerg };
 }
 
+/* ── Patrimônio real (Fase 3c): motor.js aplicado ao histórico do ledger ── */
+function construirMeses(anoIni, mesIni, anoFim, mesFim) {
+  const out = [];
+  let y = anoIni, m = mesIni;
+  while (y < anoFim || (y === anoFim && m <= mesFim)) {
+    out.push({ year: y, month: m });
+    m++; if (m > 12) { m = 1; y++; }
+  }
+  return out;
+}
+
+/* Busca o ledger completo na nuvem e roda o motor de rendimento por classe
+   (inclusive arquivadas — dinheiro antigo nelas continua contando no
+   patrimônio total, só não aparece mais na lista editável de alocação).
+   `meses` cobre do primeiro registro do ledger até o mês real de hoje —
+   sempre contínuo, como o motor exige. */
+async function carregarEvolucaoInvestimentos() {
+  if (!window.store || !window.store.buscarLedgerCompleto) return null;
+  const { classes, ledger } = await window.store.buscarLedgerCompleto();
+  // null = "ainda sem dado" (aplicarPatrimonioReal não mexe na tela, mantém
+  // os números chapados) — diferente de "patrimônio é zero de verdade", que
+  // nunca é o caso aqui: se não há nem classe nem ledger, não há como saber.
+  if (!classes.length || !ledger.length) return null;
+
+  const hoje = new Date();
+  const anoFim = hoje.getFullYear(), mesFim = hoje.getMonth() + 1;
+  let anoIni = anoFim, mesIni = mesFim;
+  ledger.forEach(l => {
+    if (l.year < anoIni || (l.year === anoIni && l.month < mesIni)) { anoIni = l.year; mesIni = l.month; }
+  });
+  const meses = construirMeses(anoIni, mesIni, anoFim, mesFim);
+
+  const porClasse = new Map();
+  classes.forEach(c => {
+    const aportes = ledger.filter(l => l.class_id === c.id)
+      .map(l => ({ year: l.year, month: l.month, valor: parseFloat(l.aporte) || 0 }));
+    const saldosReais = ledger.filter(l => l.class_id === c.id && l.saldo_real !== null && l.saldo_real !== undefined)
+      .map(l => ({ year: l.year, month: l.month, saldo: parseFloat(l.saldo_real) }));
+    const evolucao = evoluirClasse({ taxaAnual: parseFloat(c.expected_return_aa) || 0, aportes, saldosReais, meses });
+    porClasse.set(c.key, { classe: c, evolucao });
+  });
+
+  const porMes = new Map();
+  meses.forEach((mes, i) => {
+    let patrimonio = 0, rendimento = 0;
+    porClasse.forEach(({ evolucao }) => {
+      const linha = evolucao[i];
+      if (linha) { patrimonio += linha.saldoFechamento; rendimento += linha.rendimento; }
+    });
+    porMes.set(`${mes.year}-${mes.month}`, { patrimonio, rendimento });
+  });
+
+  return { porClasse, porMes };
+}
+
+/* Substitui os números chapados pelos reais assim que o cálculo chega —
+   nunca bloqueia o primeiro render, só atualiza por cima. */
+function aplicarPatrimonioReal(dados, todasClasses, classes, reserva, acumEmerg) {
+  if (!dados) return;
+  const { porClasse, porMes } = dados;
+
+  let patrimonioTotalVal = 0, aportadoTotal = 0;
+  porClasse.forEach(({ evolucao }) => {
+    const ultima = evolucao[evolucao.length - 1];
+    if (ultima) patrimonioTotalVal += ultima.saldoFechamento;
+    aportadoTotal += evolucao.reduce((s, l) => s + l.aporte, 0);
+  });
+  const rendimentoAcumulado = patrimonioTotalVal - aportadoTotal;
+
+  const valEl = document.getElementById('inv-patrimonio-val');
+  const subEl = document.getElementById('inv-patrimonio-sub');
+  if (valEl) valEl.textContent = fmt(patrimonioTotalVal);
+  if (subEl) {
+    subEl.textContent = rendimentoAcumulado >= 0
+      ? `${fmt(rendimentoAcumulado)} de rendimento`
+      : `${fmt(Math.abs(rendimentoAcumulado))} de perda projetada`;
+  }
+
+  const porClasseReal = new Map();
+  classes.forEach(c => {
+    const info = porClasse.get(c.key);
+    const ultima = info && info.evolucao[info.evolucao.length - 1];
+    porClasseReal.set(c.key, ultima ? ultima.saldoFechamento : 0);
+  });
+  renderInvSaldoClasses(classes, null, porClasseReal);
+
+  if (reserva) {
+    const infoReserva = porClasse.get(reserva.key);
+    const ultimaReserva = infoReserva && infoReserva.evolucao[infoReserva.evolucao.length - 1];
+    const { emerg } = getInvLancados(curMonth, curYear);
+    // Sem "infoReserva" ainda (classe não sincronizada no instante da leitura),
+    // passa undefined — não 0 — pra renderReserva cair no valor chapado real
+    // (acumEmerg) em vez de exibir zero por engano.
+    renderReserva(todasClasses, emerg, acumEmerg, infoReserva ? (ultimaReserva ? ultimaReserva.saldoFechamento : 0) : undefined);
+  }
+
+  renderInvHistory(porMes);
+}
+
+let invRenderSeq = 0; // trava contra resposta assíncrona desatualizada sobrescrever uma mais nova
+
 function renderInvest() {
+  const meuSeq = ++invRenderSeq;
+
   // Classes padrão só existem "na memória" até serem salvas — sem isso, o
   // motor de rendimento nunca teria onde escrever o aporte do mês. Persiste
   // na primeira visita à aba, uma única vez (não sobrescreve o que já existe).
   if (!localStorage.getItem('fin_inv_classes')) saveInvClasses(loadInvClasses());
-  // Toda visita a esta aba também garante que o mês real de hoje está
-  // sincronizado e preenche qualquer mês antigo sem registro no ledger —
-  // sem nunca reescrever um mês que já tem ledger gravado (ver store.js).
-  if (window.store && window.store.garantirLedgerCompleto) {
-    window.store.garantirLedgerCompleto()
-      .catch(err => console.error('[invest] erro ao sincronizar aportes', err));
-  }
 
   const todasClasses = loadInvClasses();
   const classes = classesDeInvestimento(todasClasses);
@@ -703,9 +799,9 @@ function renderInvest() {
       <div class="metric-card-sub">Soma dos dois</div>
     </div>
     <div class="metric-card">
-      <div class="metric-card-label">Acumulado total</div>
-      <div class="metric-card-val green">${fmt(acumTotal)}</div>
-      <div class="metric-card-sub">Todos os meses</div>
+      <div class="metric-card-label">Patrimônio</div>
+      <div class="metric-card-val green" id="inv-patrimonio-val">${fmt(acumTotal)}</div>
+      <div class="metric-card-sub" id="inv-patrimonio-sub">calculando rendimento...</div>
     </div>
   `;
 
@@ -715,6 +811,28 @@ function renderInvest() {
   renderInvHistory();
   renderInvSaldoClasses(classes, acumIndep);
   renderReserva(todasClasses, emerg, acumEmerg);
+
+  // Toda visita a esta aba também garante que o mês real de hoje está
+  // sincronizado e preenche qualquer mês antigo sem registro no ledger —
+  // sem nunca reescrever um mês que já tem ledger gravado (ver store.js).
+  // A LEITURA (carregarEvolucaoInvestimentos) só começa DEPOIS da escrita
+  // terminar — as duas rodando em paralelo é o que fazia a leitura vencer
+  // a corrida e mostrar patrimônio zerado no primeiro acesso.
+  const sincronizar = (window.store && window.store.garantirLedgerCompleto)
+    ? window.store.garantirLedgerCompleto().catch(err => console.error('[invest] erro ao sincronizar aportes', err))
+    : Promise.resolve();
+
+  // Substitui os números chapados acima pelos reais (com juros) assim que
+  // o cálculo chegar — sem bloquear o primeiro desenho da tela. Se, enquanto
+  // isso, uma visita mais nova a esta aba já rodou (meuSeq desatualizado),
+  // descarta o resultado em vez de sobrescrever o que já está mais atual.
+  sincronizar
+    .then(() => carregarEvolucaoInvestimentos())
+    .then(dados => {
+      if (meuSeq !== invRenderSeq) return;
+      aplicarPatrimonioReal(dados, todasClasses, classes, reserva, acumEmerg);
+    })
+    .catch(err => console.error('[invest] erro ao calcular patrimônio real', err));
 }
 
 function getInvLancadosFromRaw(md) {
@@ -867,12 +985,13 @@ function renderInvClasses(todasClasses, aporte) {
 
 /* Reserva de Emergência: card separado, sem % de rateio — recebe 100% do
    que for lançado em "emergencia" e tem sua própria taxa esperada. */
-function renderReserva(todasClasses, aporteMes, acumEmerg) {
+function renderReserva(todasClasses, aporteMes, acumEmerg, saldoReal) {
   const container = document.getElementById('inv-reserva');
   if (!container) return;
   const reserva = classeReserva(todasClasses);
   if (!reserva) { container.innerHTML = ''; return; }
   const aaPct = ((parseFloat(reserva.aa)||0) * 100).toFixed(2);
+  const acumExibido = (saldoReal === null || saldoReal === undefined) ? acumEmerg : saldoReal;
 
   container.innerHTML = `
     <div class="reserva-row">
@@ -882,7 +1001,7 @@ function renderReserva(todasClasses, aporteMes, acumEmerg) {
       </div>
       <div>
         <div class="reserva-label">Acumulado</div>
-        <div class="reserva-val green">${fmt(acumEmerg)}</div>
+        <div class="reserva-val green">${fmt(acumExibido)}</div>
       </div>
     </div>
     <div class="inv-class-extra">
@@ -939,7 +1058,11 @@ function renderInvPie(classes, aporte) {
     </div>`).join('');
 }
 
-function renderInvHistory() {
+/* porMes: Map("year-month" -> {patrimonio, rendimento}) do motor de
+   rendimento, opcional — enquanto não chega, mostra a soma chapada dos
+   aportes (igual ao comportamento anterior) para nunca deixar a tabela
+   em branco esperando a rede. */
+function renderInvHistory(porMes) {
   const months = [];
   let m = curMonth, y = curYear;
   for (let i = 0; i < 12; i++) {
@@ -951,12 +1074,17 @@ function renderInvHistory() {
   const rows = months.map(({m, y}) => {
     const { indep, emerg, total } = getInvLancados(m, y);
     acum += total;
-    return { label: `${MONTHS[m].slice(0,3)}/${y}`, indep, emerg, total, acum };
+    const real = porMes && porMes.get(`${y}-${m+1}`);
+    return {
+      label: `${MONTHS[m].slice(0,3)}/${y}`, indep, emerg, total,
+      rendimento: real ? real.rendimento : null,
+      patrimonio: real ? real.patrimonio : acum,
+    };
   }).filter(r => r.total > 0);
 
   const tbody = document.getElementById('inv-history-body');
   if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:1rem;font-size:12px">Lance valores nas categorias Independência Financeira e Reserva de Emergência na calculadora para ver o histórico aqui.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:1rem;font-size:12px">Lance valores nas categorias Independência Financeira e Reserva de Emergência na calculadora para ver o histórico aqui.</td></tr>`;
     return;
   }
   tbody.innerHTML = rows.map(r => `
@@ -965,15 +1093,17 @@ function renderInvHistory() {
       <td class="num">${fmt(r.indep)}</td>
       <td class="num">${fmt(r.emerg)}</td>
       <td class="num">${fmt(r.total)}</td>
-      <td class="num green">${fmt(r.acum)}</td>
+      <td class="num ${r.rendimento === null ? '' : 'green'}">${r.rendimento === null ? '—' : fmt(r.rendimento)}</td>
+      <td class="num green">${fmt(r.patrimonio)}</td>
     </tr>`).join('');
 }
 
-function renderInvSaldoClasses(classes, acumTotal) {
-  /* Se acumTotal não foi passado, recalcula só a partir da Independência —
-     a Reserva de Emergência não participa do rateio das classes de
-     investimento, tem seu próprio card. */
-  if (acumTotal === null) {
+/* porClasseReal: Map(classKey -> saldoFechamento), do motor de rendimento —
+   quando presente, mostra o patrimônio REAL de cada classe (com juros).
+   Sem ele (ainda calculando, ou offline), cai no rateio teórico chapado —
+   nunca deixa o card vazio esperando a rede. */
+function renderInvSaldoClasses(classes, acumTotal, porClasseReal) {
+  if (!porClasseReal && acumTotal === null) {
     acumTotal = 0;
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
@@ -984,13 +1114,14 @@ function renderInvSaldoClasses(classes, acumTotal) {
     }
   }
 
-  // Rateia pela soma real das % (não por 100 fixo) para bater com o que é
-  // gravado no banco mesmo quando as % não somam exatamente 100%.
+  // Sem dado real ainda: rateia pela soma das % (não por 100 fixo), pra
+  // bater com o que é gravado no banco mesmo se as % não somarem 100%.
   const somaPct = classes.reduce((s, c) => s + (parseFloat(c.pct) || 0), 0);
   const container = document.getElementById('inv-saldo-classes');
   container.innerHTML = classes.map(cls => {
     const pct2 = parseFloat(cls.pct) || 0;
-    const val = somaPct > 0 ? acumTotal * pct2 / somaPct : 0;
+    const val = porClasseReal ? (porClasseReal.get(cls.key) || 0)
+      : (somaPct > 0 ? acumTotal * pct2 / somaPct : 0);
     return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border)">
       <span style="width:7px;height:7px;border-radius:50%;background:${cls.color};flex-shrink:0"></span>
       <span style="font-size:12px;color:var(--text2);flex:1">${esc(cls.label)}</span>
@@ -999,7 +1130,10 @@ function renderInvSaldoClasses(classes, acumTotal) {
     </div>`;
   }).join('');
 
-  document.getElementById('inv-total-acum').textContent = fmt(acumTotal);
+  const totalExibido = porClasseReal
+    ? [...porClasseReal.values()].reduce((s, v) => s + v, 0)
+    : acumTotal;
+  document.getElementById('inv-total-acum').textContent = fmt(totalExibido);
 }
 
 /* ── Init ── */
