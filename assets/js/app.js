@@ -774,14 +774,33 @@ function saveInvClasses(cls) { localStorage.setItem('fin_inv_classes', JSON.stri
 function classesDeInvestimento(todas) { return todas.filter(c => c.key !== RESERVA_KEY); }
 function classeReserva(todas) { return todas.find(c => c.key === RESERVA_KEY); }
 
-/* Pega os valores LANÇADOS nos itens de independencia e emergencia do mês */
+/* Carteira separada pra Meta de Curto/Médio Prazo (Fase C) — dinheiro de
+   um objetivo de 1-2 anos não deveria correr o mesmo risco que aposentadoria
+   de longo prazo, então mix inicial mais conservador. Sem Reserva aqui: ela
+   é liquidez única, sempre na carteira de Independência. */
+const INV_CLASSES_META_DEFAULT = [
+  { key: 'renda_fixa', label: 'Renda Fixa', pct: 70, color: '#1a1a18', aa: 0.11 },
+  { key: 'fii',        label: 'FII',        pct: 30, color: '#888780', aa: 0.10 },
+];
+function loadInvClassesMeta() {
+  const raw = localStorage.getItem('fin_inv_classes_meta');
+  if (raw) return JSON.parse(raw);
+  return INV_CLASSES_META_DEFAULT.map(c => ({ ...c }));
+}
+function saveInvClassesMeta(cls) { localStorage.setItem('fin_inv_classes_meta', JSON.stringify(cls)); }
+
+/* Pega os valores LANÇADOS nos itens de independencia, meta e emergencia do
+   mês. "total" continua só indep+emerg (o que "Aporte do mês" sempre
+   representou) — Meta é rastreada à parte, com sua própria carteira. */
 function getInvLancados(m, y) {
   const md = loadMonth(m, y);
   const catIndep = md.cats.find(c => c.key === 'independencia');
+  const catMeta = md.cats.find(c => c.key === 'meta');
   const catEmerg = md.cats.find(c => c.key === 'emergencia');
   const indep = catIndep ? catIndep.items.reduce((s, it) => s + (parseFloat(it.value)||0), 0) : 0;
+  const meta = catMeta ? catMeta.items.reduce((s, it) => s + (parseFloat(it.value)||0), 0) : 0;
   const emerg = catEmerg ? catEmerg.items.reduce((s, it) => s + (parseFloat(it.value)||0), 0) : 0;
-  return { indep, emerg, total: indep + emerg };
+  return { indep, meta, emerg, total: indep + emerg };
 }
 
 /* ── Patrimônio real (Fase 3c): motor.js aplicado ao histórico do ledger ── */
@@ -800,9 +819,9 @@ function construirMeses(anoIni, mesIni, anoFim, mesFim) {
    patrimônio total, só não aparece mais na lista editável de alocação).
    `meses` cobre do primeiro registro do ledger até o mês real de hoje —
    sempre contínuo, como o motor exige. */
-async function carregarEvolucaoInvestimentos() {
+async function carregarEvolucaoInvestimentos(portfolio) {
   if (!window.store || !window.store.buscarLedgerCompleto) return null;
-  const { classes, ledger } = await window.store.buscarLedgerCompleto();
+  const { classes, ledger } = await window.store.buscarLedgerCompleto(portfolio);
   // null = "ainda sem dado" (aplicarPatrimonioReal não mexe na tela, mantém
   // os números chapados) — diferente de "patrimônio é zero de verdade", que
   // nunca é o caso aqui: se não há nem classe nem ledger, não há como saber.
@@ -883,6 +902,33 @@ function aplicarPatrimonioReal(dados, todasClasses, classes, reserva, acumEmerg)
   renderInvHistory(porMes);
 }
 
+/* Carteira da Meta (Fase C): desenho inicial chapado (igual ao padrão já
+   usado nas outras carteiras — nunca deixa a tela vazia esperando a rede).
+   Retorna as classes carregadas pra quem chamou poder passar adiante. */
+function renderInvestMeta(aporteMeta, acumMeta) {
+  if (!localStorage.getItem('fin_inv_classes_meta')) saveInvClassesMeta(loadInvClassesMeta());
+  const classesMeta = loadInvClassesMeta();
+  document.getElementById('inv-meta-aporte-val').textContent = fmt(aporteMeta);
+  document.getElementById('inv-meta-patrimonio-val').textContent = fmt(acumMeta);
+  renderInvClassesMeta(classesMeta, aporteMeta);
+  return classesMeta;
+}
+
+/* Substitui o patrimônio chapado da Meta pelo real (com juros) assim que
+   chega — mesma ideia de aplicarPatrimonioReal, só que sem histórico/saldo
+   por classe (a carteira da Meta é intencionalmente mais enxuta). */
+function aplicarPatrimonioRealMeta(dados) {
+  if (!dados) return;
+  const { porClasse } = dados;
+  let total = 0;
+  porClasse.forEach(({ evolucao }) => {
+    const ultima = evolucao[evolucao.length - 1];
+    if (ultima) total += ultima.saldoFechamento;
+  });
+  const el = document.getElementById('inv-meta-patrimonio-val');
+  if (el) el.textContent = fmt(total);
+}
+
 let invRenderSeq = 0; // trava contra resposta assíncrona desatualizada sobrescrever uma mais nova
 
 function renderInvest() {
@@ -896,13 +942,14 @@ function renderInvest() {
   const todasClasses = loadInvClasses();
   const classes = classesDeInvestimento(todasClasses);
   const reserva = classeReserva(todasClasses);
-  const { indep, emerg, total } = getInvLancados(curMonth, curYear);
+  const { indep, meta, emerg, total } = getInvLancados(curMonth, curYear);
 
   document.getElementById('inv-month-lbl').textContent = `${MONTHS[curMonth]} ${curYear}`;
 
   /* Acumulado histórico: soma real de todos os meses, já separado por destino
-     — Independência alimenta as classes de investimento, Emergência é caixa. */
-  let acumIndep = 0, acumEmerg = 0;
+     — Independência alimenta as classes de investimento, Emergência é caixa,
+     Meta alimenta a carteira própria dela. */
+  let acumIndep = 0, acumMeta = 0, acumEmerg = 0;
   const allKeys = [];
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
@@ -911,6 +958,7 @@ function renderInvest() {
   allKeys.forEach(k => {
     const l = getInvLancadosFromRaw(JSON.parse(localStorage.getItem(k)));
     acumIndep += l.indep;
+    acumMeta += l.meta;
     acumEmerg += l.emerg;
   });
   const acumTotal = acumIndep + acumEmerg;
@@ -945,6 +993,7 @@ function renderInvest() {
   renderInvHistory();
   renderInvSaldoClasses(classes, acumIndep);
   renderReserva(todasClasses, emerg, acumEmerg);
+  const classesMeta = renderInvestMeta(meta, acumMeta);
 
   // Toda visita a esta aba também garante que o mês real de hoje está
   // sincronizado e preenche qualquer mês antigo sem registro no ledger —
@@ -961,20 +1010,31 @@ function renderInvest() {
   // isso, uma visita mais nova a esta aba já rodou (meuSeq desatualizado),
   // descarta o resultado em vez de sobrescrever o que já está mais atual.
   sincronizar
-    .then(() => carregarEvolucaoInvestimentos())
+    .then(() => carregarEvolucaoInvestimentos('independencia'))
     .then(dados => {
       if (meuSeq !== invRenderSeq) return;
       aplicarPatrimonioReal(dados, todasClasses, classes, reserva, acumEmerg);
     })
     .catch(err => console.error('[invest] erro ao calcular patrimônio real', err));
+
+  // Mesma lógica, carteira separada — nunca se mistura com a de cima.
+  sincronizar
+    .then(() => carregarEvolucaoInvestimentos('meta'))
+    .then(dados => {
+      if (meuSeq !== invRenderSeq) return;
+      aplicarPatrimonioRealMeta(dados);
+    })
+    .catch(err => console.error('[invest] erro ao calcular patrimônio real da meta', err));
 }
 
 function getInvLancadosFromRaw(md) {
   const catIndep = md.cats.find(c => c.key === 'independencia');
+  const catMeta = md.cats.find(c => c.key === 'meta');
   const catEmerg = md.cats.find(c => c.key === 'emergencia');
   const indep = catIndep ? catIndep.items.reduce((s, it) => s + (parseFloat(it.value)||0), 0) : 0;
+  const meta = catMeta ? catMeta.items.reduce((s, it) => s + (parseFloat(it.value)||0), 0) : 0;
   const emerg = catEmerg ? catEmerg.items.reduce((s, it) => s + (parseFloat(it.value)||0), 0) : 0;
-  return { indep, emerg, total: indep + emerg };
+  return { indep, meta, emerg, total: indep + emerg };
 }
 
 function renderInvAporteRows(indep, emerg, total) {
@@ -1016,8 +1076,10 @@ function renderInvAporteRows(indep, emerg, total) {
 }
 
 /* Um input de "saldo real" que salva na nuvem ao perder o foco, com um
-   pequeno retorno visual — reaproveitado pelas classes e pela reserva. */
-function ligarSaldoReal(container, classKey) {
+   pequeno retorno visual — reaproveitado pelas classes e pela reserva.
+   `portfolio` é obrigatório desde a Fase C: Meta e Independência podem ter
+   uma classe com a mesma key. */
+function ligarSaldoReal(container, classKey, portfolio) {
   const input = container.querySelector('.inv-saldo-real-input');
   const msg = container.querySelector('.inv-saldo-real-msg');
   input.addEventListener('change', async e => {
@@ -1026,7 +1088,7 @@ function ligarSaldoReal(container, classKey) {
     msg.textContent = 'Salvando...';
     msg.className = 'inv-saldo-real-msg';
     try {
-      await window.store.salvarSaldoReal(classKey, valor);
+      await window.store.salvarSaldoReal(classKey, valor, portfolio);
       msg.textContent = 'Salvo ✓';
       msg.className = 'inv-saldo-real-msg ok';
     } catch (err) {
@@ -1101,7 +1163,7 @@ function renderInvClasses(todasClasses, aporte) {
       saveInvClasses(todasClasses);
       renderInvest();
     });
-    ligarSaldoReal(div, cls.key);
+    ligarSaldoReal(div, cls.key, 'independencia');
     container.appendChild(div);
   });
 
@@ -1113,6 +1175,84 @@ function renderInvClasses(todasClasses, aporte) {
     const palette = ['#2C2C2A','#5f5e5a','#888780','#b4b2a9','#d3d1c7','#444441'];
     todasClasses.push({ key: 'cls_' + Date.now(), label: 'Nova classe', pct: 0, color: palette[classes.length % palette.length], aa: 0 });
     saveInvClasses(todasClasses);
+    renderInvest();
+  });
+}
+
+/* Mesma ideia de renderInvClasses, carteira separada da Meta de
+   Curto/Médio Prazo — sem Reserva (ela nunca faz parte disso, é liquidez
+   única e sempre fica na carteira de Independência). */
+function renderInvClassesMeta(classesMeta, aporte) {
+  const totalPct = classesMeta.reduce((s, c) => s + (parseFloat(c.pct) || 0), 0);
+  const warn = document.getElementById('inv-meta-pct-warning');
+  if (totalPct > 100.01) {
+    warn.style.display = 'block';
+    warn.innerHTML = `<div class="pct-warning">⚠ Porcentagens somam ${totalPct.toFixed(0)}% — acima de 100%</div>`;
+  } else { warn.style.display = 'none'; }
+  document.getElementById('inv-meta-pct-lbl').textContent = `${totalPct.toFixed(0)}% alocados`;
+
+  const container = document.getElementById('inv-classes-meta');
+  container.innerHTML = '';
+  classesMeta.forEach(cls => {
+    const val = totalPct > 0 ? aporte * (parseFloat(cls.pct)||0) / totalPct : 0;
+    const aaPct = ((parseFloat(cls.aa)||0) * 100).toFixed(2);
+    const div = document.createElement('div');
+    div.className = 'category';
+    div.innerHTML = `
+      <div class="cat-header" style="cursor:default">
+        <span class="cat-dot" style="background:${cls.color}"></span>
+        <input class="item-name" type="text" value="${esc(cls.label)}" placeholder="Classe" style="font-size:12px;font-weight:500;max-width:130px">
+        <div class="cat-pct-wrap" style="margin-left:auto">
+          <input class="cat-pct-input" type="number" min="0" max="100" step="1" value="${cls.pct}">
+          <span class="cat-pct-sym">%</span>
+        </div>
+        <span class="cat-value">${fmt(val)}</span>
+        <button class="del-btn" title="Remover"><i class="ti ti-x"></i></button>
+      </div>
+      <div class="inv-class-extra">
+        <label>Taxa esperada<input class="inv-aa-input" type="number" step="0.1" value="${aaPct}"> % a.a.</label>
+        <label>Saldo real<input class="inv-saldo-real-input" type="number" min="0" step="0.01" placeholder="Opcional"></label>
+        <span class="inv-saldo-real-msg"></span>
+      </div>
+    `;
+    div.querySelector('.item-name').addEventListener('input', e => {
+      cls.label = e.target.value;
+      saveInvClassesMeta(classesMeta);
+    });
+    div.querySelector('.cat-pct-input').addEventListener('change', e => {
+      cls.pct = parseFloat(e.target.value) || 0;
+      saveInvClassesMeta(classesMeta);
+      renderInvest();
+    });
+    div.querySelector('.inv-aa-input').addEventListener('change', e => {
+      cls.aa = (parseFloat(e.target.value) || 0) / 100;
+      saveInvClassesMeta(classesMeta);
+    });
+    div.querySelector('.del-btn').addEventListener('click', () => {
+      // Sem nenhuma classe, o aporte da Meta ficaria sem destino nenhum —
+      // mantém sempre pelo menos uma.
+      if (classesMeta.length <= 1) {
+        warn.style.display = 'block';
+        warn.innerHTML = `<div class="pct-warning">⚠ Mantenha pelo menos uma classe</div>`;
+        return;
+      }
+      const idx = classesMeta.findIndex(c => c.key === cls.key);
+      if (idx >= 0) classesMeta.splice(idx, 1);
+      saveInvClassesMeta(classesMeta);
+      renderInvest();
+    });
+    ligarSaldoReal(div, cls.key, 'meta');
+    container.appendChild(div);
+  });
+
+  const addWrap = document.createElement('div');
+  addWrap.style.cssText = 'padding:0.6rem 1.25rem;border-top:0.5px solid var(--border)';
+  addWrap.innerHTML = `<button class="add-item-btn" id="inv-add-class-meta"><i class="ti ti-plus"></i> Adicionar classe</button>`;
+  container.appendChild(addWrap);
+  document.getElementById('inv-add-class-meta').addEventListener('click', () => {
+    const palette = ['#2C2C2A','#5f5e5a','#888780','#b4b2a9','#d3d1c7','#444441'];
+    classesMeta.push({ key: 'cls_' + Date.now(), label: 'Nova classe', pct: 0, color: palette[classesMeta.length % palette.length], aa: 0 });
+    saveInvClassesMeta(classesMeta);
     renderInvest();
   });
 }
@@ -1148,7 +1288,7 @@ function renderReserva(todasClasses, aporteMes, acumEmerg, saldoReal) {
     reserva.aa = (parseFloat(e.target.value) || 0) / 100;
     saveInvClasses(todasClasses);
   });
-  ligarSaldoReal(container, reserva.key);
+  ligarSaldoReal(container, reserva.key, 'independencia');
 }
 
 function renderInvPie(classes, aporte) {
@@ -1481,12 +1621,18 @@ function aplicarPerfil(resultado) {
     risco: resultado.risco,
     respostas: resultado.respostas,
   }));
-  // Fase B3: aplica o mix de investimento (horizonte x risco) só nas classes
-  // conhecidas (renda_fixa/ações/fii/exterior) — uma classe extra que o
-  // usuário tenha criado além dessas 4 não é tocada. invest_classes não tem
-  // histórico por mês (isso é o invest_ledger, nunca mexido aqui), então não
-  // existe o mesmo risco de reescrever um mês passado que existe em cats_pct.
-  const todasClasses = loadInvClasses();
+  // Fase B3 + C: aplica o mix de investimento (horizonte x risco) só nas
+  // classes conhecidas (renda_fixa/ações/fii/exterior) — uma classe extra
+  // que o usuário tenha criado além dessas 4 não é tocada. O mix vai pra
+  // carteira certa: perfil "Meta de Curto/Médio Prazo" usa o horizonte que
+  // a pessoa respondeu (curto/médio) e esse dinheiro tem destino próprio
+  // (a carteira da Meta, mais conservadora) — não faz sentido aplicar esse
+  // mesmo mix na carteira de Independência, que é sempre de longo prazo.
+  // invest_classes não tem histórico por mês (isso é o invest_ledger, nunca
+  // mexido aqui), então não existe o mesmo risco de reescrever um mês
+  // passado que existe em cats_pct.
+  const ehPerfilMeta = resultado.perfilKey === 'objetivo_meta';
+  const todasClasses = ehPerfilMeta ? loadInvClassesMeta() : loadInvClasses();
   let mudouClasses = false;
   todasClasses.forEach((c) => {
     const novoPct = resultado.mixInvestimento[c.key];
@@ -1495,7 +1641,10 @@ function aplicarPerfil(resultado) {
       mudouClasses = true;
     }
   });
-  if (mudouClasses) saveInvClasses(todasClasses);
+  if (mudouClasses) {
+    if (ehPerfilMeta) saveInvClassesMeta(todasClasses);
+    else saveInvClasses(todasClasses);
+  }
   // Aplica no mês REAL de hoje (new Date(), nunca curMonth/curYear) — a
   // Perfil pode ser aberta com a Calculadora deixada em qualquer mês
   // passado, e mexer nesse cursor reescreveria um mês já salvo por causa
