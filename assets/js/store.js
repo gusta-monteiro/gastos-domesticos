@@ -121,7 +121,24 @@
     };
     const totalIndep = totalDe("independencia");
     const totalEmerg = totalDe("emergencia");
-    if (totalIndep <= 0 && totalEmerg <= 0) return;
+    if (totalIndep <= 0 && totalEmerg <= 0) {
+      // Nada lançado neste mês. Mês que nunca teve aporte não escreve linha
+      // zerada à toa (o WHERE aporte!=0 abaixo já garante isso sozinho, sem
+      // precisar de uma leitura antes — um SELECT-depois-UPDATE separado
+      // deixaria uma janela pra uma edição concorrente no mesmo mês (apagar
+      // e relançar rápido) intercalar e o zeramento vencer por cima de um
+      // valor novo de verdade). Mas se JÁ existe aporte (o usuário apagou um
+      // lançamento que antes tinha valor), precisa zerar agora — senão o
+      // ledger fica "preso" com o valor antigo pra sempre, e ele continua
+      // entrando no patrimônio mesmo sem aparecer em lugar nenhum na
+      // Calculadora.
+      const { error: eUpd } = await db.from("invest_ledger")
+        .update({ aporte: 0, updated_at: new Date().toISOString() })
+        .eq("user_id", userId).eq("year", year).eq("month", month)
+        .neq("aporte", 0);
+      if (eUpd) throw eUpd;
+      return;
+    }
 
     const classes = classesPreCarregadas || await buscarClassesAtivas();
     if (!classes.length) return;
