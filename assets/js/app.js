@@ -1383,6 +1383,8 @@ const PERFIL_CATS_LABEL = {
   conforto: 'Conforto', emergencia: 'Reserva de Emergência', meta: 'Meta de Curto/Médio Prazo',
 };
 const PERFIL_CATS_ORDEM = ['independencia', 'fixos', 'variaveis', 'conforto', 'emergencia', 'meta'];
+const PERFIL_MIX_LABEL = { renda_fixa: 'Renda Fixa', acoes: 'Ações', fii: 'FII', exterior: 'Internacional' };
+const PERFIL_MIX_ORDEM = ['renda_fixa', 'acoes', 'fii', 'exterior'];
 
 function pctPadrao(key) {
   const raw = localStorage.getItem('fin_perfil');
@@ -1458,6 +1460,15 @@ function renderPerfilResultado(resultado) {
       `).join('')}
     </div>
     <div class="perfil-resultado-reserva">Meta de reserva sugerida: ${resultado.mesesReserva} meses de Custos Fixos.</div>
+    <div class="perfil-resultado-subtitulo">Mix de investimento sugerido (Renda Fixa/Ações/FII/Internacional)</div>
+    <div class="perfil-resultado-cats">
+      ${PERFIL_MIX_ORDEM.map(k => `
+        <div class="perfil-resultado-cat-row">
+          <span class="nome">${PERFIL_MIX_LABEL[k]}</span>
+          <span class="pct">${resultado.mixInvestimento[k]}%</span>
+        </div>
+      `).join('')}
+    </div>
     <button class="btn btn-primary" id="btn-aplicar-perfil">Aplicar esse perfil</button>
   `;
   document.getElementById('btn-aplicar-perfil').addEventListener('click', () => aplicarPerfil(resultado));
@@ -1470,6 +1481,21 @@ function aplicarPerfil(resultado) {
     risco: resultado.risco,
     respostas: resultado.respostas,
   }));
+  // Fase B3: aplica o mix de investimento (horizonte x risco) só nas classes
+  // conhecidas (renda_fixa/ações/fii/exterior) — uma classe extra que o
+  // usuário tenha criado além dessas 4 não é tocada. invest_classes não tem
+  // histórico por mês (isso é o invest_ledger, nunca mexido aqui), então não
+  // existe o mesmo risco de reescrever um mês passado que existe em cats_pct.
+  const todasClasses = loadInvClasses();
+  let mudouClasses = false;
+  todasClasses.forEach((c) => {
+    const novoPct = resultado.mixInvestimento[c.key];
+    if (typeof novoPct === 'number' && c.pct !== novoPct) {
+      c.pct = novoPct;
+      mudouClasses = true;
+    }
+  });
+  if (mudouClasses) saveInvClasses(todasClasses);
   // Aplica no mês REAL de hoje (new Date(), nunca curMonth/curYear) — a
   // Perfil pode ser aberta com a Calculadora deixada em qualquer mês
   // passado, e mexer nesse cursor reescreveria um mês já salvo por causa
@@ -1486,7 +1512,7 @@ function aplicarPerfil(resultado) {
     saveMonth(mHoje, yHoje, md);
     if (curMonth === mHoje && curYear === yHoje) renderCalc();
   }
-  showProfileMsg('perfil-msg', 'success', 'Perfil aplicado! A partir de hoje, os meses vão usar essas porcentagens.');
+  showProfileMsg('perfil-msg', 'success', 'Perfil aplicado! A partir de hoje, os meses e o mix de investimento vão usar essas porcentagens.');
 }
 
 document.getElementById('btn-calcular-perfil').addEventListener('click', () => {

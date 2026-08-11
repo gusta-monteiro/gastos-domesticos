@@ -602,6 +602,15 @@
 .perfil-resultado-cat-row .nome { flex: 1; }
 .perfil-resultado-cat-row .pct { font-weight: 500; color: var(--text); min-width: 34px; text-align: right; }
 .perfil-resultado-reserva { font-size: 11px; color: var(--text3); }
+.perfil-resultado-subtitulo {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text3);
+  border-top: 0.5px solid var(--border);
+  padding-top: 0.5rem;
+}
 
 .profile-msg {
   font-size: 12px;
