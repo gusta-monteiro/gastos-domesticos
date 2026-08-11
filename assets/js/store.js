@@ -299,6 +299,35 @@
     queue(INV_KEY);
   }
 
+  /* Correção única (ver commit 1e5f51f): contas que já tinham um aporte de
+     Independência/Emergência apagado ANTES do fix ficaram com o ledger
+     "preso" no valor antigo, inflando o patrimônio calculado sem aparecer
+     em lugar nenhum na Calculadora. Roda pushInvestLedger só nos meses que
+     JÁ estão com total zero — nunca nos que têm valor, então é impossível
+     isso re-ratear um mês histórico pelas % de hoje (o bug que a Fase 3b
+     existe pra evitar). Marca uma flag local pra rodar uma única vez. */
+  async function corrigirLedgerFantasma() {
+    if (localStorage.getItem("fin_ledger_fantasma_fixed")) return;
+    const zerados = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const info = monthFromKey(localStorage.key(i));
+      if (!info) continue;
+      let md;
+      try { md = JSON.parse(localStorage.getItem(localStorage.key(i))); } catch { continue; }
+      const totalDe = (key) => {
+        const cat = (md.cats || []).find((c) => c.key === key);
+        return cat ? cat.items.reduce((s, it) => s + (parseFloat(it.value) || 0), 0) : 0;
+      };
+      if (totalDe("independencia") <= 0 && totalDe("emergencia") <= 0) zerados.push({ info, md });
+    }
+    // Cada mês mexe numa linha de ledger diferente (year/month distintos) —
+    // não há conflito em rodar em paralelo, e isso evita que uma conta com
+    // muito histórico demore vários round-trips seguidos só nesta correção
+    // única, atrasando o primeiro carregamento do app.
+    await Promise.all(zerados.map(({ info, md }) => pushInvestLedger(info.year, info.month, md.cats || [])));
+    nativeSetItem("fin_ledger_fantasma_fixed", "1");
+  }
+
   async function init() {
     const user = await requireSession();
     if (!user) return;
@@ -319,6 +348,11 @@
       ensureReservaClasse();
     } catch (err) {
       console.error("[store] erro ao garantir a classe de reserva", err);
+    }
+    try {
+      await corrigirLedgerFantasma();
+    } catch (err) {
+      console.error("[store] erro ao corrigir ledger fantasma", err);
     }
   }
 
