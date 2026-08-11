@@ -12,6 +12,29 @@ let curYear  = new Date().getFullYear();
 let pieChart = null, barChart = null, stackChart = null;
 let pieRenda = 0; // renda do último render — o tooltip do gráfico lê daqui
 
+/* ── Tema (modo escuro) ── */
+function estaEscuro() { return typeof window.temaEscuro === 'function' && window.temaEscuro(); }
+// Segmentos de pizza/doughnut ficam escuros demais pra distinguir do fundo
+// escuro sem um contorno claro — no claro, sem contorno (como já era).
+function corBordaSegmento() { return estaEscuro() ? 'rgba(255,255,255,0.12)' : 'transparent'; }
+function corGradeGrafico() { return estaEscuro() ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)'; }
+// Lê a cor de texto secundária direto da variável CSS — sempre em dia com o
+// tema atual, sem duplicar os valores aqui.
+function corTextoGrafico() {
+  const v = getComputedStyle(document.documentElement).getPropertyValue('--text2').trim();
+  return v || '#5f5e5a';
+}
+// Gráficos em <canvas> não repintam sozinhos quando o tema muda — refaz os
+// que existem e redesenha a página visível, pra pegar as cores novas.
+window.addEventListener('temamudou', () => {
+  if (pieChart) { pieChart.destroy(); pieChart = null; }
+  if (invPieChart) { invPieChart.destroy(); invPieChart = null; }
+  const pagina = document.querySelector('.nav-item.active')?.dataset.page;
+  if (pagina === 'calc') renderCalc();
+  else if (pagina === 'period') renderPeriod();
+  else if (pagina === 'invest') renderInvest();
+});
+
 /* ── Storage helpers ── */
 function mKey(m, y) { return `${y}-${String(m+1).padStart(2,'0')}`; }
 function loadMonth(m, y) {
@@ -287,7 +310,7 @@ function renderPie(md, renda) {
         datasets: [{
           data: vals,
           backgroundColor: [...CATS.map(c => c.color), LIVRE_COLOR],
-          borderColor: 'transparent', borderWidth: 0, hoverOffset: 4
+          borderColor: corBordaSegmento(), borderWidth: estaEscuro() ? 1 : 0, hoverOffset: 4
         }]
       },
       options: {
@@ -431,16 +454,16 @@ function renderPeriod() {
     data: {
       labels,
       datasets: [
-        { label: 'Renda', data: rendas, backgroundColor: '#2C2C2A' },
-        { label: 'Gastos', data: gastos, backgroundColor: '#B4B2A9' }
+        { label: 'Renda', data: rendas, backgroundColor: '#2C2C2A', borderColor: corBordaSegmento(), borderWidth: estaEscuro() ? 1 : 0 },
+        { label: 'Gastos', data: gastos, backgroundColor: '#B4B2A9', borderColor: corBordaSegmento(), borderWidth: estaEscuro() ? 1 : 0 }
       ]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { font: { family: 'Inter', size: 11 }, autoSkip: false }, grid: { display: false } },
-        y: { ticks: { font: { family: 'Inter', size: 11 }, callback: v => 'R$' + (v/1000).toFixed(0) + 'k' }, grid: { color: 'rgba(0,0,0,0.05)' } }
+        x: { ticks: { font: { family: 'Inter', size: 11 }, color: corTextoGrafico(), autoSkip: false }, grid: { display: false } },
+        y: { ticks: { font: { family: 'Inter', size: 11 }, color: corTextoGrafico(), callback: v => 'R$' + (v/1000).toFixed(0) + 'k' }, grid: { color: corGradeGrafico() } }
       }
     }
   });
@@ -453,6 +476,7 @@ function renderPeriod() {
       return d.cats[ci] ? d.cats[ci].items.reduce((s, it) => s + (parseFloat(it.value)||0), 0) : 0;
     }),
     backgroundColor: def.color,
+    borderColor: corBordaSegmento(), borderWidth: estaEscuro() ? 1 : 0,
   }));
 
   if (stackChart) stackChart.destroy();
@@ -463,8 +487,8 @@ function renderPeriod() {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { stacked: true, ticks: { font: { family: 'Inter', size: 11 }, autoSkip: false }, grid: { display: false } },
-        y: { stacked: true, ticks: { font: { family: 'Inter', size: 11 }, callback: v => 'R$' + (v/1000).toFixed(0) + 'k' }, grid: { color: 'rgba(0,0,0,0.05)' } }
+        x: { stacked: true, ticks: { font: { family: 'Inter', size: 11 }, color: corTextoGrafico(), autoSkip: false }, grid: { display: false } },
+        y: { stacked: true, ticks: { font: { family: 'Inter', size: 11 }, color: corTextoGrafico(), callback: v => 'R$' + (v/1000).toFixed(0) + 'k' }, grid: { color: corGradeGrafico() } }
       }
     }
   });
@@ -1037,7 +1061,7 @@ function renderInvPie(classes, aporte) {
       type: 'doughnut',
       data: {
         labels: classes.map(c => c.label),
-        datasets: [{ data: vals, backgroundColor: colors, borderColor: 'transparent', borderWidth: 0, hoverOffset: 4 }]
+        datasets: [{ data: vals, backgroundColor: colors, borderColor: corBordaSegmento(), borderWidth: estaEscuro() ? 1 : 0, hoverOffset: 4 }]
       },
       options: {
         responsive: false, cutout: '62%',

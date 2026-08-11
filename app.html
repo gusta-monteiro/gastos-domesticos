@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/main.css">
+<script src="assets/js/theme.js"></script>
 </head>
 <body>
 <div class="shell">
@@ -25,6 +26,9 @@
     </nav>
     <div class="sidebar-footer">
       <div class="nav-item" data-page="profile"><i class="ti ti-user-circle"></i> <span id="sidebar-username">Perfil</span></div>
+      <button class="theme-toggle sidebar-theme-toggle" type="button" aria-label="Mudar tema">
+        <i class="ti ti-moon"></i> <span>Tema</span>
+      </button>
     </div>
   </aside>
 
@@ -40,9 +44,12 @@
           <button id="next-month" aria-label="Próximo mês"><i class="ti ti-chevron-right"></i></button>
         </div>
       </div>
-      <div class="renda-wrap">
-        <label>Renda do mês</label>
-        <span class="renda-total" id="renda-total">R$ 0,00</span>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div class="renda-wrap">
+          <label>Renda do mês</label>
+          <span class="renda-total" id="renda-total">R$ 0,00</span>
+        </div>
+        <button class="theme-toggle" type="button" aria-label="Mudar tema"><i class="ti ti-moon"></i></button>
       </div>
     </div>
 

@@ -11,6 +11,61 @@
     --border2: rgba(0,0,0,0.18);
     --radius: 8px;
     --radius-lg: 12px;
+    --c-green: #1a7a4a;
+    --c-red: #c0392b;
+    --c-amber: #b07c10;
+    --bg-danger: #fff5f5;
+    --border-danger: rgba(192,57,43,0.25);
+    --bg-danger-hover: #ffe8e8;
+    --bg-success: #f0faf5;
+    --border-success: rgba(26,122,74,0.2);
+    --chart-border: transparent;
+    --chart-grid: rgba(0,0,0,0.05);
+  }
+
+  /* Modo escuro: segue o sistema por padrão; [data-theme] força a escolha
+     manual do usuário (ver assets/js/theme.js) por cima da preferência do SO. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1a1a18;
+      --bg2: #232320;
+      --bg3: #2c2c2a;
+      --text: #f0f0ee;
+      --text2: #b4b2a9;
+      --text3: #8a8880;
+      --border: rgba(255,255,255,0.10);
+      --border2: rgba(255,255,255,0.18);
+      --c-green: #4ade80;
+      --c-red: #f87171;
+      --c-amber: #fbbf24;
+      --bg-danger: rgba(248,113,113,0.12);
+      --border-danger: rgba(248,113,113,0.35);
+      --bg-danger-hover: rgba(248,113,113,0.2);
+      --bg-success: rgba(74,222,128,0.12);
+      --border-success: rgba(74,222,128,0.3);
+      --chart-border: rgba(255,255,255,0.12);
+      --chart-grid: rgba(255,255,255,0.08);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1a1a18;
+    --bg2: #232320;
+    --bg3: #2c2c2a;
+    --text: #f0f0ee;
+    --text2: #b4b2a9;
+    --text3: #8a8880;
+    --border: rgba(255,255,255,0.10);
+    --border2: rgba(255,255,255,0.18);
+    --c-green: #4ade80;
+    --c-red: #f87171;
+    --c-amber: #fbbf24;
+    --bg-danger: rgba(248,113,113,0.12);
+    --border-danger: rgba(248,113,113,0.35);
+    --bg-danger-hover: rgba(248,113,113,0.2);
+    --bg-success: rgba(74,222,128,0.12);
+    --border-success: rgba(74,222,128,0.3);
+    --chart-border: rgba(255,255,255,0.12);
+    --chart-grid: rgba(255,255,255,0.08);
   }
 
   body {
@@ -71,6 +126,19 @@
     position: sticky; top: 0; z-index: 5;
   }
   .topbar-left { display: flex; align-items: center; gap: 1rem; }
+  .theme-toggle {
+    background: none;
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    width: 30px; height: 30px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: var(--text);
+    font-size: 15px;
+    transition: background 0.15s;
+  }
+  .theme-toggle:hover { background: var(--bg2); }
   .page-title { font-size: 13px; font-weight: 500; }
   .month-nav { display: flex; align-items: center; gap: 6px; }
   .month-nav button {
@@ -106,9 +174,9 @@
   .metric-card-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text3); margin-bottom: 6px; }
   .metric-card-val { font-size: 20px; font-weight: 500; color: var(--text); }
   .metric-card-sub { font-size: 11px; color: var(--text3); margin-top: 3px; }
-  .green { color: #1a7a4a !important; }
-  .red { color: #c0392b !important; }
-  .amber { color: #b07c10 !important; }
+  .green { color: var(--c-green) !important; }
+  .red { color: var(--c-red) !important; }
+  .amber { color: var(--c-amber) !important; }
 
   /* ── Layout principal calculadora ── */
   .calc-grid { display: grid; grid-template-columns: 1fr 300px; gap: 1.5rem; }
@@ -179,11 +247,11 @@
 
   .pct-warning {
     margin: 0.5rem 1.25rem;
-    font-size: 11px; color: #c0392b;
+    font-size: 11px; color: var(--c-red);
     padding: 6px 10px;
-    background: #fff5f5;
+    background: var(--bg-danger);
     border-radius: var(--radius);
-    border: 0.5px solid rgba(192,57,43,0.2);
+    border: 0.5px solid var(--border-danger);
   }
 
   /* ── Gráfico ── */
@@ -229,7 +297,7 @@
   }
   .btn:hover { background: var(--bg2); }
   .btn-primary { background: var(--text); color: var(--bg); border-color: var(--text); }
-  .btn-primary:hover { background: #333; }
+  .btn-primary:hover { opacity: 0.85; }
 
   .report-card {
     background: var(--bg); border: 0.5px solid var(--border);
@@ -307,6 +375,24 @@
   border-top: 0.5px solid var(--border);
   padding: 0.5rem 0;
 }
+.sidebar-theme-toggle {
+  width: calc(100% - 2.5rem);
+  margin: 2px 1.25rem 0;
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0.6rem 0;
+  font-size: 13px;
+  font-family: 'Inter', sans-serif;
+  color: var(--text2);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.sidebar-theme-toggle i { font-size: 16px; }
+.sidebar-theme-toggle:hover { color: var(--text); }
 
 /* ── Perfil ── */
 .profile-grid {
@@ -411,25 +497,25 @@
   padding: 8px 12px;
   border-radius: var(--radius);
 }
-.profile-msg.success { background: #f0faf5; color: #1a7a4a; border: 0.5px solid rgba(26,122,74,0.2); }
-.profile-msg.error { background: #fff5f5; color: #c0392b; border: 0.5px solid rgba(192,57,43,0.2); }
+.profile-msg.success { background: var(--bg-success); color: var(--c-green); border: 0.5px solid var(--border-success); }
+.profile-msg.error { background: var(--bg-danger); color: var(--c-red); border: 0.5px solid var(--border-danger); }
 .btn-logout {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 0.5px solid rgba(192,57,43,0.3);
+  border: 0.5px solid var(--border-danger);
   border-radius: var(--radius);
   padding: 8px 16px;
   font-size: 12px;
   font-weight: 500;
   font-family: 'Inter', sans-serif;
   cursor: pointer;
-  background: #fff5f5;
-  color: #c0392b;
+  background: var(--bg-danger);
+  color: var(--c-red);
   transition: background 0.15s;
   width: fit-content;
 }
-.btn-logout:hover { background: #ffe8e8; }
+.btn-logout:hover { background: var(--bg-danger-hover); }
 
 /* Modal de confirmação */
 .confirm-overlay {
@@ -486,8 +572,8 @@
 }
 .inv-class-extra input:focus { outline: none; border-color: var(--text3); }
 .inv-saldo-real-msg { font-size: 10px; color: var(--text3); }
-.inv-saldo-real-msg.ok { color: #1a7a4a; }
-.inv-saldo-real-msg.erro { color: #c0392b; }
+.inv-saldo-real-msg.ok { color: var(--c-green); }
+.inv-saldo-real-msg.erro { color: var(--c-red); }
 
 .reserva-row {
   display: flex;

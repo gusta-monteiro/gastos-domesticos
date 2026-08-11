@@ -13,6 +13,45 @@
   --radius-lg: 12px;
   --red: #c0392b;
   --green: #1a7a4a;
+  --bg-danger: #fff5f5;
+  --border-danger: rgba(192,57,43,0.2);
+  --bg-success: #f0faf5;
+  --border-success: rgba(26,122,74,0.2);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1a1a18;
+    --bg2: #232320;
+    --bg3: #2c2c2a;
+    --text: #f0f0ee;
+    --text2: #b4b2a9;
+    --text3: #8a8880;
+    --border: rgba(255,255,255,0.10);
+    --border2: rgba(255,255,255,0.18);
+    --red: #f87171;
+    --green: #4ade80;
+    --bg-danger: rgba(248,113,113,0.12);
+    --border-danger: rgba(248,113,113,0.35);
+    --bg-success: rgba(74,222,128,0.12);
+    --border-success: rgba(74,222,128,0.3);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1a1a18;
+  --bg2: #232320;
+  --bg3: #2c2c2a;
+  --text: #f0f0ee;
+  --text2: #b4b2a9;
+  --text3: #8a8880;
+  --border: rgba(255,255,255,0.10);
+  --border2: rgba(255,255,255,0.18);
+  --red: #f87171;
+  --green: #4ade80;
+  --bg-danger: rgba(248,113,113,0.12);
+  --border-danger: rgba(248,113,113,0.35);
+  --bg-success: rgba(74,222,128,0.12);
+  --border-success: rgba(74,222,128,0.3);
 }
 
 body {
@@ -54,6 +93,18 @@ nav {
   transition: color 0.15s;
 }
 .nav-back:hover { color: var(--text2); }
+.theme-toggle {
+  background: none;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--radius);
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 15px;
+  transition: background 0.15s;
+}
+.theme-toggle:hover { background: var(--bg2); }
 
 /* ── Layout ── */
 .auth-wrap {
@@ -131,7 +182,7 @@ nav {
   transition: background 0.15s;
   margin-top: 0.25rem;
 }
-.btn-submit:hover { background: #333; }
+.btn-submit:hover { opacity: 0.85; }
 .btn-submit:disabled { background: var(--text3); cursor: not-allowed; }
 
 .forgot-link {
@@ -177,8 +228,8 @@ nav {
   border-radius: var(--radius);
   display: none;
 }
-.msg.error { background: #fff5f5; color: var(--red); border: 0.5px solid rgba(192,57,43,0.2); display: block; }
-.msg.success { background: #f0faf5; color: var(--green); border: 0.5px solid rgba(26,122,74,0.2); display: block; }
+.msg.error { background: var(--bg-danger); color: var(--red); border: 0.5px solid var(--border-danger); display: block; }
+.msg.success { background: var(--bg-success); color: var(--green); border: 0.5px solid var(--border-success); display: block; }
 
 .auth-footer-note {
   font-size: 11px;
