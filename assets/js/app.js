@@ -10,6 +10,7 @@ const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','A
 let curMonth = new Date().getMonth();
 let curYear  = new Date().getFullYear();
 let pieChart = null, barChart = null, stackChart = null;
+let pieRenda = 0; // renda do último render — o tooltip do gráfico lê daqui
 
 /* ── Storage helpers ── */
 function mKey(m, y) { return `${y}-${String(m+1).padStart(2,'0')}`; }
@@ -28,6 +29,11 @@ function fmt(v) {
   return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 function pct(a, b) { return b > 0 ? Math.round(a / b * 100) : 0; }
+/* Escapa texto do usuário antes de entrar em innerHTML/atributos */
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 
 /* ── Navigation ── */
 document.querySelectorAll('.nav-item').forEach(el => {
@@ -69,6 +75,7 @@ function renderCalc() {
   renderMetrics(md, renda);
   renderCategories(md, renda);
   renderPie(md, renda);
+  renderRecorrentes();
 }
 
 function renderMetrics(md, renda) {
@@ -81,9 +88,9 @@ function renderMetrics(md, renda) {
       <div class="metric-card-val">${fmt(renda)}</div>
     </div>
     <div class="metric-card">
-      <div class="metric-card-label">Alocado</div>
+      <div class="metric-card-label">Objetivo</div>
       <div class="metric-card-val">${fmt(totalAlocado)}</div>
-      <div class="metric-card-sub">${pct(totalAlocado, renda)}% da renda</div>
+      <div class="metric-card-sub">meta: ${pct(totalAlocado, renda)}% da renda</div>
     </div>
     <div class="metric-card">
       <div class="metric-card-label">Lançado</div>
@@ -102,9 +109,9 @@ function renderCategories(md, renda) {
   const warn = document.getElementById('pct-warning');
   if (totalPct > 100.01) {
     warn.style.display = 'block';
-    warn.innerHTML = `<div class="pct-warning">⚠ Porcentagens somam ${totalPct.toFixed(0)}% — acima de 100%</div>`;
+    warn.innerHTML = `<div class="pct-warning">⚠ Metas somam ${totalPct.toFixed(0)}% — acima de 100% da renda</div>`;
   } else { warn.style.display = 'none'; }
-  document.getElementById('pct-total-lbl').textContent = `${totalPct.toFixed(0)}% alocados`;
+  document.getElementById('pct-total-lbl').textContent = `Meta: ${totalPct.toFixed(0)}%`;
 
   const container = document.getElementById('categories');
   container.innerHTML = '';
@@ -125,13 +132,13 @@ function renderCategories(md, renda) {
           <input class="cat-pct-input" type="number" min="0" max="100" step="1" value="${cat.pct}">
           <span class="cat-pct-sym">%</span>
         </div>
-        <span class="cat-value">${fmt(alocado)}</span>
+        <span class="cat-value">${fmt(lancado)}<span class="cat-value-meta"> / ${fmt(alocado)}</span></span>
         <i class="ti ti-chevron-down cat-toggle ${isOpen ? 'open' : ''}"></i>
       </div>
       <div class="cat-items ${isOpen ? 'open' : ''}">
         ${cat.items.map((it, ii) => `
           <div class="item-row">
-            <input class="item-name" type="text" placeholder="Descrição" value="${it.name||''}" data-ci="${ci}" data-ii="${ii}">
+            <input class="item-name" type="text" placeholder="Descrição" value="${esc(it.name)}" data-ci="${ci}" data-ii="${ii}">
             <input class="item-val" type="number" placeholder="0" min="0" value="${it.value||''}" data-ci="${ci}" data-ii="${ii}">
             <button class="del-btn" data-ci="${ci}" data-ii="${ii}"><i class="ti ti-x"></i></button>
           </div>
@@ -194,10 +201,17 @@ function renderCategories(md, renda) {
   });
 }
 
+/* O gráfico mostra a distribuição REAL dos lançamentos; as porcentagens das
+   categorias são apenas meta/objetivo. A fatia "Livre" é o que resta da renda. */
+const LIVRE_COLOR = '#e7e6e0';
+
 function renderPie(md, renda) {
-  const vals = md.cats.map(c => renda * (parseFloat(c.pct)||0) / 100);
-  const colors = CATS.map(c => c.color);
-  document.getElementById('chart-center-val').textContent = fmt(renda);
+  pieRenda = renda;
+  const lancados = md.cats.map(c => c.items.reduce((s, it) => s + (parseFloat(it.value)||0), 0));
+  const totalLancado = lancados.reduce((s, v) => s + v, 0);
+  const livre = Math.max(renda - totalLancado, 0);
+  const vals = [...lancados, livre];
+  document.getElementById('chart-center-val').textContent = fmt(totalLancado);
 
   if (pieChart) {
     pieChart.data.datasets[0].data = vals;
@@ -206,30 +220,82 @@ function renderPie(md, renda) {
     pieChart = new Chart(document.getElementById('pieChart'), {
       type: 'doughnut',
       data: {
-        labels: CATS.map(c => c.label),
-        datasets: [{ data: vals, backgroundColor: colors, borderColor: 'transparent', borderWidth: 0, hoverOffset: 4 }]
+        labels: [...CATS.map(c => c.label), 'Livre'],
+        datasets: [{
+          data: vals,
+          backgroundColor: [...CATS.map(c => c.color), LIVRE_COLOR],
+          borderColor: 'transparent', borderWidth: 0, hoverOffset: 4
+        }]
       },
       options: {
         responsive: false, cutout: '62%',
         plugins: {
           legend: { display: false },
-          tooltip: { callbacks: { label: ctx => `${fmt(ctx.raw)} (${pct(ctx.raw, renda)}%)` } }
+          tooltip: { callbacks: { label: ctx => `${fmt(ctx.raw)} (${pct(ctx.raw, pieRenda)}% da renda)` } }
         }
       }
     });
   }
 
-  document.getElementById('legend').innerHTML = md.cats.map((cat, ci) => {
+  const rows = md.cats.map((cat, ci) => {
     const def = CATS[ci];
-    const p = parseFloat(cat.pct)||0;
-    const v = renda * p / 100;
     return `<div class="leg-row">
       <span class="leg-dot" style="background:${def.color}"></span>
       <span class="leg-name">${def.label}</span>
-      <span class="leg-val">${fmt(v)}</span>
-      <span class="leg-pct">${p}%</span>
+      <span class="leg-val">${fmt(lancados[ci])}</span>
+      <span class="leg-pct">${pct(lancados[ci], renda)}%</span>
+      <span class="leg-meta">meta ${parseFloat(cat.pct)||0}%</span>
     </div>`;
-  }).join('');
+  });
+  rows.push(`<div class="leg-row">
+      <span class="leg-dot" style="background:${LIVRE_COLOR}"></span>
+      <span class="leg-name">Livre</span>
+      <span class="leg-val">${fmt(livre)}</span>
+      <span class="leg-pct">${pct(livre, renda)}%</span>
+      <span class="leg-meta"></span>
+    </div>`);
+  document.getElementById('legend').innerHTML = rows.join('');
+}
+
+/* ── Sugestões de lançamentos recorrentes (detecção em recorrentes.js) ── */
+function renderRecorrentes() {
+  const panel = document.getElementById('recorrentes-panel');
+  if (!panel) return;
+  const sugs = (typeof detectarRecorrentes === 'function')
+    ? detectarRecorrentes(curMonth, curYear) : [];
+  if (!sugs.length) { panel.style.display = 'none'; panel.innerHTML = ''; return; }
+
+  const catDe = k => CATS.find(c => c.key === k) || { label: k, color: '#888780' };
+  panel.style.display = 'block';
+  panel.innerHTML = `
+    <div class="rec-card">
+      <div class="rec-head">
+        <span class="rec-title"><i class="ti ti-repeat"></i> Recorrentes de meses anteriores</span>
+        <button class="btn" id="rec-add-all"><i class="ti ti-plus"></i> Adicionar todos</button>
+      </div>
+      ${sugs.map((s, i) => `
+        <div class="rec-row">
+          <span class="rec-dot" style="background:${catDe(s.catKey).color}"></span>
+          <span class="rec-name">${esc(s.name)}</span>
+          <span class="rec-tag">${s.tipo ? esc(s.tipo) : `repetiu ${s.meses}×`}</span>
+          <span class="rec-cat">${esc(catDe(s.catKey).label)}</span>
+          <span class="rec-val">${fmt(s.value)}</span>
+          <button class="rec-add" data-i="${i}" title="Adicionar ao mês"><i class="ti ti-plus"></i></button>
+        </div>`).join('')}
+    </div>`;
+
+  const aplicar = (lista) => {
+    const md = loadMonth(curMonth, curYear);
+    lista.forEach(s => {
+      const cat = md.cats.find(c => c.key === s.catKey);
+      if (cat) cat.items.push({ name: s.name, value: String(s.value) });
+    });
+    saveMonth(curMonth, curYear, md);
+    renderCalc();
+  };
+  panel.querySelectorAll('.rec-add').forEach(b =>
+    b.addEventListener('click', () => aplicar([sugs[parseInt(b.dataset.i)]])));
+  document.getElementById('rec-add-all').addEventListener('click', () => aplicar(sugs));
 }
 
 /* ══ PERÍODO ══ */
@@ -480,6 +546,7 @@ const INV_CLASSES_DEFAULT = [
 ];
 
 let invPieChart = null;
+let invAporteAtual = 0; // aporte do último render — o tooltip lê daqui
 
 function loadInvClasses() {
   const raw = localStorage.getItem('fin_inv_classes');
@@ -574,7 +641,7 @@ function renderInvAporteRows(indep, emerg, total) {
         </div>
         ${cat.items.map(it => `
           <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0 3px 14px;border-bottom:0.5px solid var(--border)">
-            <span style="color:var(--text2)">${it.name || '—'}</span>
+            <span style="color:var(--text2)">${esc(it.name) || '—'}</span>
             <span style="font-weight:500">${fmt(it.value)}</span>
           </div>
         `).join('')}
@@ -610,7 +677,7 @@ function renderInvClasses(classes, aporte) {
     div.innerHTML = `
       <div class="cat-header" style="cursor:default">
         <span class="cat-dot" style="background:${cls.color}"></span>
-        <input class="item-name" type="text" value="${cls.label}" data-ci="${ci}" placeholder="Classe" style="font-size:12px;font-weight:500;max-width:150px">
+        <input class="item-name" type="text" value="${esc(cls.label)}" data-ci="${ci}" placeholder="Classe" style="font-size:12px;font-weight:500;max-width:150px">
         <div class="cat-pct-wrap" style="margin-left:auto">
           <input class="cat-pct-input" type="number" min="0" max="100" step="1" value="${cls.pct}" data-ci="${ci}">
           <span class="cat-pct-sym">%</span>
@@ -651,6 +718,7 @@ function renderInvClasses(classes, aporte) {
 }
 
 function renderInvPie(classes, aporte) {
+  invAporteAtual = aporte;
   const vals = classes.map(c => aporte * (parseFloat(c.pct)||0) / 100);
   const colors = classes.map(c => c.color);
   const totalVal = vals.reduce((s, v) => s + v, 0);
@@ -672,7 +740,7 @@ function renderInvPie(classes, aporte) {
         responsive: false, cutout: '62%',
         plugins: {
           legend: { display: false },
-          tooltip: { callbacks: { label: ctx => `${fmt(ctx.raw)} (${aporte > 0 ? Math.round(ctx.raw/aporte*100) : 0}%)` } }
+          tooltip: { callbacks: { label: ctx => `${fmt(ctx.raw)} (${invAporteAtual > 0 ? Math.round(ctx.raw/invAporteAtual*100) : 0}%)` } }
         }
       }
     });
@@ -681,7 +749,7 @@ function renderInvPie(classes, aporte) {
   document.getElementById('inv-legend').innerHTML = classes.map((cls, ci) => `
     <div class="leg-row">
       <span class="leg-dot" style="background:${cls.color}"></span>
-      <span class="leg-name">${cls.label}</span>
+      <span class="leg-name">${esc(cls.label)}</span>
       <span class="leg-val">${fmt(vals[ci])}</span>
       <span class="leg-pct">${parseFloat(cls.pct)||0}%</span>
     </div>`).join('');
@@ -736,7 +804,7 @@ function renderInvSaldoClasses(classes, acumTotal) {
     const val = acumTotal * pct2 / 100;
     return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border)">
       <span style="width:7px;height:7px;border-radius:50%;background:${cls.color};flex-shrink:0"></span>
-      <span style="font-size:12px;color:var(--text2);flex:1">${cls.label}</span>
+      <span style="font-size:12px;color:var(--text2);flex:1">${esc(cls.label)}</span>
       <span style="font-size:12px;font-weight:500">${fmt(val)}</span>
       <span style="font-size:10px;color:var(--text3);min-width:28px;text-align:right">${pct2}%</span>
     </div>`;
@@ -749,7 +817,9 @@ function renderInvSaldoClasses(classes, acumTotal) {
 const _now = new Date();
 curMonth = _now.getMonth();
 curYear  = _now.getFullYear();
-renderCalc();
+/* Espera a sincronização com a nuvem (store.js) antes do primeiro render,
+   para exibir os dados baixados. Se o store não existir, renderiza direto. */
+(window.store ? window.store.ready : Promise.resolve()).then(renderCalc);
 /* ══ PERFIL ══ */
 async function renderProfile() {
   const { data: { user } } = await db.auth.getUser();

@@ -50,6 +50,7 @@
     <!-- Calculadora -->
     <div class="page active" id="page-calc">
       <div class="metric-grid" id="metric-grid"></div>
+      <div id="recorrentes-panel" style="display:none"></div>
       <div class="calc-grid">
         <div class="card">
           <div class="card-header">
@@ -65,7 +66,7 @@
             <div class="chart-wrap">
               <canvas id="pieChart" role="img" aria-label="Gráfico de distribuição dos gastos por categoria" width="200" height="200"></canvas>
               <div class="chart-center">
-                <div class="chart-center-lbl">Total</div>
+                <div class="chart-center-lbl">Lançado</div>
                 <div class="chart-center-val" id="chart-center-val">R$ 0</div>
               </div>
             </div>
@@ -287,6 +288,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/js/supabase.js"></script>
+<script src="assets/js/store.js"></script>
+<script src="assets/js/recorrentes.js"></script>
 <script src="assets/js/app.js"></script>
 </body>
 </html>

@@ -457,3 +457,48 @@
 @media (max-width: 900px) {
   .profile-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Meta (objetivo) ao lado do valor lançado na categoria ── */
+.cat-value-meta { font-size: 11px; font-weight: 400; color: var(--text3); }
+.leg-meta { font-size: 9px; color: var(--text3); min-width: 52px; text-align: right; }
+
+/* ── Painel de lançamentos recorrentes ── */
+.rec-card {
+  background: var(--bg); border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg); margin-bottom: 1.5rem;
+  overflow: hidden;
+}
+.rec-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.8rem 1.25rem;
+  border-bottom: 0.5px solid var(--border);
+}
+.rec-title {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text3);
+}
+.rec-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0.5rem 1.25rem;
+  border-bottom: 0.5px solid var(--border);
+  font-size: 12px;
+}
+.rec-row:last-child { border-bottom: none; }
+.rec-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.rec-name { flex: 1; color: var(--text); font-weight: 500; }
+.rec-tag {
+  font-size: 10px; color: var(--text3);
+  background: var(--bg2); border: 0.5px solid var(--border);
+  border-radius: 20px; padding: 1px 8px; white-space: nowrap;
+}
+.rec-cat { font-size: 11px; color: var(--text3); min-width: 130px; text-align: right; }
+.rec-val { font-weight: 500; min-width: 90px; text-align: right; font-variant-numeric: tabular-nums; }
+.rec-add {
+  background: none; border: 0.5px solid var(--border2); border-radius: 5px;
+  width: 24px; height: 24px; cursor: pointer; color: var(--text2);
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.rec-add:hover { background: var(--bg2); color: var(--text); }
