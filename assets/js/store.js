@@ -14,6 +14,7 @@
 (function () {
   const MONTH_RE = /^fin_(\d{4})-(\d{2})$/;
   const INV_KEY = "fin_inv_classes";
+  const PERFIL_KEY = "fin_perfil";
   // Reserva de Emergência é liquidez, não uma classe de risco: não entra no
   // rateio por % das outras classes, recebe 100% do que for lançado em
   // "emergencia". Mesma tabela (invest_classes), key reservada para diferenciar.
@@ -40,13 +41,22 @@
 
   /* ── Nuvem → localStorage ── */
   async function pull() {
-    const [{ data: months, error: e1 }, { data: classes, error: e2 }] = await Promise.all([
+    // O perfil é tratado à parte (best-effort, nunca com throw): é a tabela
+    // mais nova, e uma migração ainda não aplicada (janela entre o deploy do
+    // front e o back terminar) não pode derrubar a sincronização de meses e
+    // classes, que são o que realmente importa pro app funcionar.
+    const perfilPromise = db.from("user_profile")
+      .select("respostas, perfil_key, cats_pct, risco").eq("user_id", userId).maybeSingle()
+      .then((r) => r, (err) => ({ data: null, error: err }));
+    const [{ data: months, error: e1 }, { data: classes, error: e2 }, { data: perfil, error: e3 }] = await Promise.all([
       db.from("budget_months").select("year, month, renda, payload").eq("user_id", userId),
       db.from("invest_classes").select("id, key, label, target_pct, color, position, archived, expected_return_aa")
         .eq("user_id", userId).order("position"),
+      perfilPromise,
     ]);
     if (e1) throw e1;
     if (e2) throw e2;
+    if (e3) console.error("[store] erro ao baixar perfil (tabela pode ainda não existir)", e3);
 
     (months || []).forEach((row) => {
       const key = `fin_${row.year}-${String(row.month).padStart(2, "0")}`;
@@ -69,6 +79,13 @@
         aa: Number(c.expected_return_aa) || 0,
       }));
       nativeSetItem(INV_KEY, JSON.stringify(ativas));
+    }
+
+    if (perfil) {
+      nativeSetItem(PERFIL_KEY, JSON.stringify({
+        respostas: perfil.respostas || {}, perfilKey: perfil.perfil_key,
+        cats_pct: perfil.cats_pct || {}, risco: perfil.risco,
+      }));
     }
     return { monthCount: (months || []).length, classCount: (classes || []).length };
   }
@@ -202,6 +219,23 @@
     }
   }
 
+  async function pushPerfil() {
+    const raw = localStorage.getItem(PERFIL_KEY);
+    if (!raw) return;
+    let p;
+    try { p = JSON.parse(raw); } catch { return; }
+    if (!p || !p.perfilKey) return;
+    const { error } = await db.from("user_profile").upsert({
+      user_id: userId,
+      respostas: p.respostas || {},
+      perfil_key: p.perfilKey,
+      cats_pct: p.cats_pct || {},
+      risco: p.risco || "moderado",
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id" });
+    if (error) throw error;
+  }
+
   async function pushInvClasses() {
     const raw = localStorage.getItem(INV_KEY);
     if (!raw) return;
@@ -251,6 +285,7 @@
     for (const key of keys) {
       try {
         if (key === INV_KEY) await pushInvClasses();
+        else if (key === PERFIL_KEY) await pushPerfil();
         else await pushMonthKey(key);
       } catch (err) {
         console.error("[store] falha ao sincronizar", key, err);
@@ -266,7 +301,7 @@
   // Intercepta as gravações do app e replica as chaves "fin_*" para a nuvem.
   localStorage.setItem = function (key, value) {
     nativeSetItem(key, value);
-    if (userId && (key === INV_KEY || MONTH_RE.test(key))) queue(key);
+    if (userId && (key === INV_KEY || key === PERFIL_KEY || MONTH_RE.test(key))) queue(key);
   };
 
   /* ── Migração única: nuvem vazia + dados locais → sobe tudo ── */

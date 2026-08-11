@@ -266,6 +266,83 @@
             </div>
           </div>
 
+          <!-- Perfil financeiro -->
+          <div class="card">
+            <div class="card-header"><span>Perfil Financeiro</span></div>
+            <div class="profile-form">
+              <p style="font-size:12px;color:var(--text2);margin-top:-0.5rem">Responda pra receber uma sugestão de como dividir sua renda entre as categorias, pensada pro seu momento.</p>
+
+              <div class="perfil-question">
+                <label>Sua renda é...</label>
+                <div class="perfil-options" data-q="rendaFixa">
+                  <label class="perfil-option"><input type="radio" name="q-rendaFixa" value="true"> Fixa (CLT, aposentado)</label>
+                  <label class="perfil-option"><input type="radio" name="q-rendaFixa" value="false"> Variável (autônomo, comissão, PJ)</label>
+                </div>
+              </div>
+
+              <div class="perfil-question">
+                <label>Quantas pessoas dependem da sua renda (contando você)?</label>
+                <div class="perfil-options" data-q="dependentes">
+                  <label class="perfil-option"><input type="radio" name="q-dependentes" value="1"> Só eu</label>
+                  <label class="perfil-option"><input type="radio" name="q-dependentes" value="2"> Eu + 1</label>
+                  <label class="perfil-option"><input type="radio" name="q-dependentes" value="3"> Eu + 2</label>
+                  <label class="perfil-option"><input type="radio" name="q-dependentes" value="4"> Eu + 3 ou mais</label>
+                </div>
+              </div>
+
+              <div class="perfil-question">
+                <label>Você tem dívida com juros altos (cartão rotativo, cheque especial, empréstimo pessoal)?</label>
+                <div class="perfil-options" data-q="temDivida">
+                  <label class="perfil-option"><input type="radio" name="q-temDivida" value="true"> Sim</label>
+                  <label class="perfil-option"><input type="radio" name="q-temDivida" value="false"> Não</label>
+                </div>
+              </div>
+
+              <div class="perfil-question">
+                <label>Sua reserva de emergência hoje está:</label>
+                <div class="perfil-options" data-q="reserva">
+                  <label class="perfil-option"><input type="radio" name="q-reserva" value="nenhuma"> Nenhuma</label>
+                  <label class="perfil-option"><input type="radio" name="q-reserva" value="parcial"> Parcial</label>
+                  <label class="perfil-option"><input type="radio" name="q-reserva" value="completa"> Completa</label>
+                </div>
+              </div>
+
+              <div class="perfil-question">
+                <label>Qual seu objetivo principal agora?</label>
+                <div class="perfil-options" data-q="objetivo">
+                  <label class="perfil-option"><input type="radio" name="q-objetivo" value="dividas"> Sair das dívidas</label>
+                  <label class="perfil-option"><input type="radio" name="q-objetivo" value="reserva"> Montar reserva de emergência</label>
+                  <label class="perfil-option"><input type="radio" name="q-objetivo" value="meta"> Juntar pra um objetivo específico (carro, viagem, etc)</label>
+                  <label class="perfil-option"><input type="radio" name="q-objetivo" value="independencia"> Aposentadoria / independência financeira</label>
+                  <label class="perfil-option"><input type="radio" name="q-objetivo" value="render"> Fazer o dinheiro render mais</label>
+                  <label class="perfil-option"><input type="radio" name="q-objetivo" value="organizar"> Só organizar, sem objetivo específico</label>
+                </div>
+              </div>
+
+              <div class="perfil-question" id="perfil-q-horizonte" style="display:none">
+                <label>Em quanto tempo pretende alcançar esse objetivo?</label>
+                <div class="perfil-options" data-q="metaHorizonte">
+                  <label class="perfil-option"><input type="radio" name="q-metaHorizonte" value="curto"> Menos de 1 ano</label>
+                  <label class="perfil-option"><input type="radio" name="q-metaHorizonte" value="medio"> Entre 1 e 5 anos</label>
+                  <label class="perfil-option"><input type="radio" name="q-metaHorizonte" value="longo"> Mais de 5 anos</label>
+                </div>
+              </div>
+
+              <div class="perfil-question">
+                <label>Se seus investimentos caíssem 20% num mês, você...</label>
+                <div class="perfil-options" data-q="risco">
+                  <label class="perfil-option"><input type="radio" name="q-risco" value="conservador"> Tiraria o dinheiro, não aguentaria ver caindo</label>
+                  <label class="perfil-option"><input type="radio" name="q-risco" value="moderado"> Ficaria incomodado, mas manteria</label>
+                  <label class="perfil-option"><input type="radio" name="q-risco" value="arrojado"> Veria como oportunidade e aportaria mais</label>
+                </div>
+              </div>
+
+              <div id="perfil-msg" class="profile-msg" style="display:none"></div>
+              <button class="btn btn-primary" id="btn-calcular-perfil">Calcular meu perfil</button>
+              <div id="perfil-resultado"></div>
+            </div>
+          </div>
+
           <!-- Alterar senha -->
           <div class="card">
             <div class="card-header"><span>Alterar senha</span></div>
@@ -317,6 +394,7 @@
 <script src="assets/js/store.js"></script>
 <script src="assets/js/recorrentes.js"></script>
 <script src="assets/js/motor.js"></script>
+<script src="assets/js/perfil.js"></script>
 <script src="assets/js/app.js"></script>
 </body>
 </html>

@@ -164,6 +164,8 @@
     transition: background 0.15s;
   }
   .month-nav button:hover { background: var(--bg2); }
+  .month-nav button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .month-nav button:disabled:hover { background: none; }
   .month-label { font-size: 13px; font-weight: 500; min-width: 130px; text-align: center; }
   .renda-wrap { display: flex; align-items: center; gap: 6px; }
   .renda-wrap label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text3); }
@@ -549,6 +551,58 @@
   background: var(--bg);
 }
 .profile-field input:focus { outline: none; border-color: var(--text3); }
+
+/* ── Perfil financeiro (questionário) ── */
+.perfil-question { display: flex; flex-direction: column; gap: 7px; }
+.perfil-question > label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+}
+.perfil-options { display: flex; flex-direction: column; gap: 6px; }
+.perfil-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--radius);
+  font-size: 12px;
+  color: var(--text2);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.perfil-option:hover { background: var(--bg2); }
+.perfil-option:has(input:checked) {
+  border-color: var(--text);
+  color: var(--text);
+  background: var(--bg2);
+  font-weight: 500;
+}
+.perfil-option input { accent-color: var(--text); flex-shrink: 0; }
+
+.perfil-resultado {
+  border: 0.5px solid var(--border2);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.perfil-resultado-titulo { font-size: 13px; font-weight: 500; color: var(--text); }
+.perfil-resultado-titulo span { color: var(--text3); font-weight: 400; }
+.perfil-resultado-cats { display: flex; flex-direction: column; gap: 4px; }
+.perfil-resultado-cat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text2);
+}
+.perfil-resultado-cat-row .nome { flex: 1; }
+.perfil-resultado-cat-row .pct { font-weight: 500; color: var(--text); min-width: 34px; text-align: right; }
+.perfil-resultado-reserva { font-size: 11px; color: var(--text3); }
+
 .profile-msg {
   font-size: 12px;
   padding: 8px 12px;

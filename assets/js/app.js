@@ -46,7 +46,7 @@ function mKey(m, y) { return `${y}-${String(m+1).padStart(2,'0')}`; }
 function loadMonth(m, y) {
   const raw = localStorage.getItem('fin_' + mKey(m, y));
   const d = raw ? JSON.parse(raw)
-    : { renda: '', rendas: [], cats: CATS.map(c => ({ key: c.key, pct: c.pct, items: [] })) };
+    : { renda: '', rendas: [], cats: CATS.map(c => ({ key: c.key, pct: pctPadrao(c.key), items: [] })) };
   // migração: meses antigos tinham só o número "renda"; viram uma entrada única
   if (!Array.isArray(d.rendas)) {
     d.rendas = (parseFloat(d.renda) > 0) ? [{ name: 'Renda', value: String(d.renda) }] : [];
@@ -142,6 +142,12 @@ document.querySelectorAll('.nav-item').forEach(el => {
   });
 });
 
+// Desabilitados até a sincronização inicial terminar (ver "Init" no fim do
+// arquivo) — navegar pra um mês nunca visitado antes disso faria pctPadrao()
+// cair no padrão de fábrica em vez do perfil de verdade (que ainda não
+// chegou da nuvem), travando esse mês errado assim que fosse editado.
+document.getElementById('prev-month').disabled = true;
+document.getElementById('next-month').disabled = true;
 document.getElementById('prev-month').addEventListener('click', () => {
   curMonth--; if (curMonth < 0) { curMonth = 11; curYear--; }
   renderCalc();
@@ -1270,7 +1276,11 @@ curMonth = _now.getMonth();
 curYear  = _now.getFullYear();
 /* Espera a sincronização com a nuvem (store.js) antes do primeiro render,
    para exibir os dados baixados. Se o store não existir, renderiza direto. */
-(window.store ? window.store.ready : Promise.resolve()).then(renderCalc);
+(window.store ? window.store.ready : Promise.resolve()).then(() => {
+  document.getElementById('prev-month').disabled = false;
+  document.getElementById('next-month').disabled = false;
+  renderCalc();
+});
 /* ══ PERFIL ══ */
 async function renderProfile() {
   const { data: { user } } = await db.auth.getUser();
@@ -1367,6 +1377,131 @@ document.getElementById('btn-save-password').addEventListener('click', async () 
   document.getElementById('profile-confirm-password').value = '';
 });
 
+/* ── Perfil financeiro (questionário, Fase B2) ── */
+const PERFIL_CATS_LABEL = {
+  independencia: 'Independência Financeira', fixos: 'Custos Fixos', variaveis: 'Custos Variáveis',
+  conforto: 'Conforto', emergencia: 'Reserva de Emergência', meta: 'Meta de Curto/Médio Prazo',
+};
+const PERFIL_CATS_ORDEM = ['independencia', 'fixos', 'variaveis', 'conforto', 'emergencia', 'meta'];
+
+function pctPadrao(key) {
+  const raw = localStorage.getItem('fin_perfil');
+  if (raw) {
+    try {
+      const perfil = JSON.parse(raw);
+      const v = perfil.cats_pct && perfil.cats_pct[key];
+      if (typeof v === 'number') return v;
+    } catch { /* ignora perfil corrompido, cai no padrão */ }
+  }
+  const def = CATS.find(c => c.key === key);
+  return def ? def.pct : 0;
+}
+
+function atualizarVisibilidadeHorizonte() {
+  const objetivo = document.querySelector('input[name="q-objetivo"]:checked')?.value;
+  document.getElementById('perfil-q-horizonte').style.display = objetivo === 'meta' ? 'flex' : 'none';
+}
+document.querySelectorAll('input[name="q-objetivo"]').forEach(inp => {
+  inp.addEventListener('change', atualizarVisibilidadeHorizonte);
+});
+
+function lerRespostasPerfilForm() {
+  const val = (name) => document.querySelector(`input[name="q-${name}"]:checked`)?.value;
+  const bool = (v) => (v === 'true' ? true : (v === 'false' ? false : undefined));
+  return {
+    rendaFixa: bool(val('rendaFixa')),
+    dependentes: val('dependentes') ? parseInt(val('dependentes')) : undefined,
+    temDivida: bool(val('temDivida')),
+    reserva: val('reserva'),
+    objetivo: val('objetivo'),
+    metaHorizonte: val('metaHorizonte'),
+    risco: val('risco'),
+  };
+}
+
+/* Marca de volta as respostas salvas (se já respondeu antes) e ajusta a
+   pergunta condicional de horizonte — chamada toda vez que a aba de Perfil
+   é aberta, já que fin_perfil pode ter chegado da nuvem depois do login. */
+function initPerfilForm() {
+  const raw = localStorage.getItem('fin_perfil');
+  if (raw) {
+    let perfil;
+    try { perfil = JSON.parse(raw); } catch { perfil = null; }
+    const respostas = perfil && perfil.respostas || {};
+    const marcar = (name, value) => {
+      if (value === undefined || value === null) return;
+      const el = document.querySelector(`input[name="q-${name}"][value="${value}"]`);
+      if (el) el.checked = true;
+    };
+    marcar('rendaFixa', respostas.rendaFixa);
+    marcar('dependentes', respostas.dependentes);
+    marcar('temDivida', respostas.temDivida);
+    marcar('reserva', respostas.reserva);
+    marcar('objetivo', respostas.objetivo);
+    marcar('metaHorizonte', respostas.metaHorizonte);
+    marcar('risco', respostas.risco);
+  }
+  atualizarVisibilidadeHorizonte();
+}
+
+function renderPerfilResultado(resultado) {
+  const el = document.getElementById('perfil-resultado');
+  el.className = 'perfil-resultado';
+  el.innerHTML = `
+    <div class="perfil-resultado-titulo">Seu perfil: <strong>${resultado.perfilLabel}</strong></div>
+    <div class="perfil-resultado-cats">
+      ${PERFIL_CATS_ORDEM.map(k => `
+        <div class="perfil-resultado-cat-row">
+          <span class="nome">${PERFIL_CATS_LABEL[k]}</span>
+          <span class="pct">${resultado.catsPct[k]}%</span>
+        </div>
+      `).join('')}
+    </div>
+    <div class="perfil-resultado-reserva">Meta de reserva sugerida: ${resultado.mesesReserva} meses de Custos Fixos.</div>
+    <button class="btn btn-primary" id="btn-aplicar-perfil">Aplicar esse perfil</button>
+  `;
+  document.getElementById('btn-aplicar-perfil').addEventListener('click', () => aplicarPerfil(resultado));
+}
+
+function aplicarPerfil(resultado) {
+  localStorage.setItem('fin_perfil', JSON.stringify({
+    perfilKey: resultado.perfilKey,
+    cats_pct: resultado.catsPct,
+    risco: resultado.risco,
+    respostas: resultado.respostas,
+  }));
+  // Aplica no mês REAL de hoje (new Date(), nunca curMonth/curYear) — a
+  // Perfil pode ser aberta com a Calculadora deixada em qualquer mês
+  // passado, e mexer nesse cursor reescreveria um mês já salvo por causa
+  // de uma ação que não tinha nada a ver com ele (exatamente o tipo de
+  // corrida que a Fase 3b existe pra evitar). Meses futuros novos já
+  // nascem com o perfil via pctPadrao(); meses passados nunca são tocados.
+  const hoje = new Date();
+  const mHoje = hoje.getMonth(), yHoje = hoje.getFullYear();
+  if (localStorage.getItem('fin_' + mKey(mHoje, yHoje))) {
+    const md = loadMonth(mHoje, yHoje);
+    md.cats.forEach(c => {
+      if (typeof resultado.catsPct[c.key] === 'number') c.pct = resultado.catsPct[c.key];
+    });
+    saveMonth(mHoje, yHoje, md);
+    if (curMonth === mHoje && curYear === yHoje) renderCalc();
+  }
+  showProfileMsg('perfil-msg', 'success', 'Perfil aplicado! A partir de hoje, os meses vão usar essas porcentagens.');
+}
+
+document.getElementById('btn-calcular-perfil').addEventListener('click', () => {
+  const respostas = lerRespostasPerfilForm();
+  const obrigatorios = ['rendaFixa', 'dependentes', 'temDivida', 'reserva', 'objetivo', 'risco'];
+  if (respostas.objetivo === 'meta') obrigatorios.push('metaHorizonte');
+  const faltando = obrigatorios.some(k => respostas[k] === undefined || respostas[k] === null || respostas[k] === '');
+  if (faltando) {
+    showProfileMsg('perfil-msg', 'error', 'Responda todas as perguntas antes de calcular.');
+    return;
+  }
+  const resultado = calcularPerfilCompleto(respostas);
+  renderPerfilResultado(resultado);
+});
+
 // Logout com confirmação
 document.getElementById('btn-logout').addEventListener('click', () => {
   document.getElementById('confirm-overlay').classList.add('open');
@@ -1383,7 +1518,7 @@ document.getElementById('confirm-logout').addEventListener('click', async () => 
 const _navItems = document.querySelectorAll('.nav-item');
 _navItems.forEach(el => {
   el.addEventListener('click', () => {
-    if (el.dataset.page === 'profile') renderProfile();
+    if (el.dataset.page === 'profile') { renderProfile(); initPerfilForm(); }
   });
 });
 
