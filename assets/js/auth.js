@@ -5,11 +5,27 @@ const forms = document.querySelectorAll(".auth-form");
 function setTab(tab) {
   tabs.forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
   forms.forEach((f) => f.classList.toggle("active", f.id === "form-" + tab));
+  document.querySelector(".auth-box").classList.toggle("recovery", tab === "forgot");
 }
 
 tabs.forEach((t) => t.addEventListener("click", () => setTab(t.dataset.tab)));
 
 if (window.location.hash === "#signup") setTab("signup");
+if (window.location.hash === "#recuperar") setTab("forgot");
+
+/* ── Navegação para a tela de recuperação ── */
+document.getElementById("link-forgot").addEventListener("click", (e) => {
+  e.preventDefault();
+  window.location.hash = "recuperar";
+  document.getElementById("forgot-email").value =
+    document.getElementById("login-email").value.trim();
+  setTab("forgot");
+});
+document.getElementById("link-back-login").addEventListener("click", (e) => {
+  e.preventDefault();
+  window.location.hash = "";
+  setTab("login");
+});
 
 /* ── Se já estiver logado, vai direto para a calculadora ── */
 db.auth.getSession().then(({ data: { session } }) => {
@@ -102,6 +118,43 @@ document.getElementById("btn-signup").addEventListener("click", async () => {
   btn.textContent = "Criar conta";
 });
 
+/* ── Recuperação de senha ── */
+document.getElementById("btn-forgot").addEventListener("click", async () => {
+  clearMsg("msg-forgot");
+  const email = document.getElementById("forgot-email").value.trim();
+
+  if (!email) {
+    showMsg("msg-forgot", "error", "Informe seu e-mail.");
+    return;
+  }
+
+  const btn = document.getElementById("btn-forgot");
+  btn.disabled = true;
+  btn.textContent = "Enviando...";
+
+  const redirectTo = new URL("redefinir-senha.html", window.location.href).href;
+  const { error } = await db.auth.resetPasswordForEmail(email, { redirectTo });
+
+  btn.disabled = false;
+  btn.textContent = "Enviar link de recuperação";
+
+  if (error) {
+    showMsg(
+      "msg-forgot",
+      "error",
+      "Não foi possível enviar agora. Aguarde alguns minutos e tente de novo.",
+    );
+    return;
+  }
+
+  /* Mensagem propositalmente genérica: não revela se o e-mail tem conta. */
+  showMsg(
+    "msg-forgot",
+    "success",
+    "Se houver uma conta com esse e-mail, o link de recuperação foi enviado. Confira também a caixa de spam.",
+  );
+});
+
 /* ── Enter para submeter ── */
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Enter") return;
@@ -109,4 +162,6 @@ document.addEventListener("keydown", (e) => {
   if (activeForm === "form-login") document.getElementById("btn-login").click();
   if (activeForm === "form-signup")
     document.getElementById("btn-signup").click();
+  if (activeForm === "form-forgot")
+    document.getElementById("btn-forgot").click();
 });

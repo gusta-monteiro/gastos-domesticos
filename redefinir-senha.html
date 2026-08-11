@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Redefinir senha — Finanças Pessoais</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/css/auth.css" />
+  </head>
+  <body>
+    <nav>
+      <a href="index.html" class="nav-logo">Finanças <span>Pessoais</span></a>
+      <a href="index.html" class="nav-back">← Voltar ao início</a>
+    </nav>
+
+    <div class="auth-wrap">
+      <div class="auth-box recovery">
+        <!-- Verificando o link -->
+        <div class="auth-form active" id="form-loading">
+          <div>
+            <div class="auth-title">Verificando o link…</div>
+            <div class="auth-subtitle">Um instante, por favor.</div>
+          </div>
+        </div>
+
+        <!-- Link válido: definir nova senha -->
+        <div class="auth-form" id="form-reset">
+          <div>
+            <div class="auth-title">Criar nova senha</div>
+            <div class="auth-subtitle">
+              Escolha uma senha nova para a sua conta
+            </div>
+          </div>
+          <div id="msg-reset" class="msg"></div>
+          <div class="field">
+            <label>Nova senha</label>
+            <input
+              type="password"
+              id="reset-password"
+              placeholder="Mínimo 6 caracteres"
+              autocomplete="new-password"
+            />
+          </div>
+          <div class="field">
+            <label>Confirmar nova senha</label>
+            <input
+              type="password"
+              id="reset-confirm"
+              placeholder="Repita a senha"
+              autocomplete="new-password"
+            />
+          </div>
+          <button class="btn-submit" id="btn-reset">Salvar nova senha</button>
+        </div>
+
+        <!-- Link inválido ou expirado -->
+        <div class="auth-form" id="form-invalid">
+          <div>
+            <div class="auth-title">Link inválido ou expirado</div>
+            <div class="auth-subtitle">
+              Links de recuperação valem por pouco tempo e só podem ser usados
+              uma vez.
+            </div>
+          </div>
+          <div class="msg error" id="msg-invalid" style="display: block">
+            Peça um novo link para redefinir sua senha.
+          </div>
+          <a class="btn-submit" id="btn-new-link" href="auth.html#recuperar"
+            style="display: block; text-align: center; text-decoration: none"
+            >Pedir novo link</a
+          >
+        </div>
+
+        <div class="auth-footer-note">
+          Por segurança, o link expira e só pode ser usado uma vez.
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <p>Calculadora de Finanças Pessoais — seus dados são seus.</p>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="assets/js/supabase.js"></script>
+    <script src="assets/js/reset.js"></script>
+  </body>
+</html>

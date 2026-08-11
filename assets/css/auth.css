@@ -134,6 +134,28 @@ nav {
 .btn-submit:hover { background: #333; }
 .btn-submit:disabled { background: var(--text3); cursor: not-allowed; }
 
+.forgot-link {
+  align-self: flex-end;
+  font-size: 11px;
+  color: var(--text3);
+  text-decoration: none;
+  margin-top: -6px;
+  transition: color 0.15s;
+}
+.forgot-link:hover { color: var(--text); }
+
+.auth-back-link {
+  font-size: 12px;
+  color: var(--text3);
+  text-decoration: none;
+  text-align: center;
+  transition: color 0.15s;
+}
+.auth-back-link:hover { color: var(--text); }
+
+/* Na tela de recuperação as abas Entrar/Cadastrar não fazem sentido */
+.auth-box.recovery .auth-tabs { display: none; }
+
 .auth-divider {
   display: flex;
   align-items: center;
