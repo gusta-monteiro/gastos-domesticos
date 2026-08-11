@@ -12,8 +12,11 @@
 <body>
 <div class="shell">
 
+  <!-- Fundo escurecido atrás do menu, só aparece no celular com o menu aberto -->
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
   <!-- Sidebar -->
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
       <h1>Finanças</h1>
       <p>Gestão doméstica</p>
@@ -37,6 +40,7 @@
     <!-- Topbar -->
     <div class="topbar">
       <div class="topbar-left">
+        <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Abrir menu"><i class="ti ti-menu-2"></i></button>
         <span class="page-title" id="page-title">Calculadora</span>
         <div class="month-nav" id="month-nav">
           <button id="prev-month" aria-label="Mês anterior"><i class="ti ti-chevron-left"></i></button>

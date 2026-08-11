@@ -67,6 +67,18 @@ function esc(s) {
 }
 
 /* ── Navigation ── */
+// No celular a barra lateral vira uma gaveta (ver main.css) — sem isso, não
+// haveria como trocar de página, já que os itens só existem dentro dela.
+function fecharMenuMobile() {
+  document.getElementById('sidebar')?.classList.remove('open');
+  document.getElementById('sidebar-backdrop')?.classList.remove('open');
+}
+document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebar-backdrop').classList.add('open');
+});
+document.getElementById('sidebar-backdrop')?.addEventListener('click', fecharMenuMobile);
+
 document.querySelectorAll('.nav-item').forEach(el => {
   el.addEventListener('click', () => {
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -79,6 +91,7 @@ document.querySelectorAll('.nav-item').forEach(el => {
     if (pg === 'period') renderPeriod();
     if (pg === 'report') renderReport();
     if (pg === 'invest') renderInvest();
+    fecharMenuMobile();
   });
 });
 

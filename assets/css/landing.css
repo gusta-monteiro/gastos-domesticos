@@ -74,6 +74,7 @@ nav {
   border: 0.5px solid var(--border2);
   border-radius: var(--radius);
   width: 30px; height: 30px;
+  flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
   color: var(--text);
@@ -109,6 +110,7 @@ nav {
   transition: background 0.15s;
 }
 .btn-solid:hover { opacity: 0.85; }
+.btn-cta-short { display: none; }
 
 /* ── Hero ── */
 .hero {
@@ -301,4 +303,11 @@ footer p { font-size: 11px; color: var(--text3); }
   .preview-box { grid-template-columns: 1fr; }
   .preview-bars { grid-column: 1; }
   footer { flex-direction: column; text-align: center; }
+  /* "Cadastrar-se — é gratuito" não cabe na barra do celular e espreme
+     tudo ao redor (inclusive o botão de tema) — nem "Cadastrar-se" sozinho
+     cabe numa linha só, e quebrar no meio da palavra fica feio. Encurta
+     pra "Cadastrar", que cabe inteiro. */
+  .btn-cta-full { display: none; }
+  .btn-cta-short { display: inline; }
+  .nav-actions { gap: 6px; }
 }
