@@ -46,6 +46,7 @@
           <button id="prev-month" aria-label="Mês anterior"><i class="ti ti-chevron-left"></i></button>
           <span class="month-label" id="month-label"></span>
           <button id="next-month" aria-label="Próximo mês"><i class="ti ti-chevron-right"></i></button>
+          <button id="btn-hoje" class="btn-hoje" style="display:none" title="Voltar para o mês atual">hoje</button>
         </div>
       </div>
       <div style="display: flex; align-items: center; gap: 12px;">
@@ -60,6 +61,7 @@
 
     <!-- Calculadora -->
     <div class="page active" id="page-calc">
+      <div id="onboarding"></div>
       <div class="metric-grid" id="metric-grid"></div>
       <div id="recorrentes-panel" style="display:none"></div>
       <div class="calc-grid">
@@ -98,6 +100,7 @@
 
     <!-- Por período -->
     <div class="page" id="page-period">
+      <div id="aviso-mes-period"></div>
       <div class="period-controls">
         <label>Período</label>
         <select id="period-select">
@@ -125,6 +128,7 @@
 
     <!-- Relatório -->
     <div class="page" id="page-report">
+      <div id="aviso-mes-report"></div>
       <div class="report-controls">
         <label style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Período</label>
         <select id="report-period">
@@ -146,6 +150,7 @@
 
     <!-- Investimentos -->
     <div class="page" id="page-invest">
+      <div id="aviso-mes-invest"></div>
 
       <!-- Cards de aporte do mês atual -->
       <div class="metric-grid" id="invest-metrics" style="margin-bottom:1.5rem"></div>

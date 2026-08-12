@@ -648,6 +648,54 @@
   padding-top: 0.5rem;
 }
 
+/* ── Mês fora do atual ── */
+.btn-hoje {
+  background: var(--text);
+  color: var(--bg);
+  border: none;
+  border-radius: 100px;
+  padding: 4px 12px;
+  font-size: 11px; font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  align-items: center;
+}
+.month-label.mes-fora { color: var(--c-amber); font-weight: 600; }
+.aviso-mes-ref {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  font-size: 12px; color: var(--text2);
+  background: var(--bg);
+  border: 0.5px solid var(--c-amber);
+  border-radius: var(--radius-lg);
+  padding: 10px 14px;
+  margin-bottom: 1.25rem;
+}
+.aviso-mes-ref strong { color: var(--c-amber); }
+
+/* ── Boas-vindas (primeiro uso) ── */
+.onboarding-card {
+  background: var(--bg);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.onboarding-titulo { font-size: 14px; font-weight: 600; margin-bottom: 0.75rem; }
+.onboarding-card ol { padding-left: 1.25rem; margin-bottom: 1rem; }
+.onboarding-card li { font-size: 13px; color: var(--text2); line-height: 1.7; }
+.onboarding-acoes { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ── Justificativa do perfil ── */
+.perfil-motivo { font-size: 12px; color: var(--text2); line-height: 1.6; }
+
+/* ── Dispensar sugestão recorrente ── */
+.rec-dismiss {
+  background: none; border: none; cursor: pointer;
+  color: var(--text3); font-size: 14px; padding: 0 2px; line-height: 1;
+  flex-shrink: 0;
+}
+.rec-dismiss:hover { color: var(--c-red); }
+
 /* ── Toast de desfazer ── */
 .undo-toast {
   position: fixed;

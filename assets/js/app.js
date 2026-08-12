@@ -30,6 +30,19 @@ function corTextoGrafico() {
   const v = getComputedStyle(document.documentElement).getPropertyValue('--text2').trim();
   return v || '#5f5e5a';
 }
+/* As cores das categorias/classes foram escolhidas pro tema claro — no
+   escuro, as mais escuras (#1a1a18 é A MESMA cor do fundo do card) somem:
+   a fatia vira um buraco no gráfico e o pontinho da legenda fica invisível.
+   Este mapa troca cada tom escuro por um equivalente claro quando o tema
+   escuro está ativo; cores já claras passam direto. */
+const CORES_TEMA_ESCURO = {
+  '#1a1a18': '#f0f0ee', '#2c2c2a': '#dedcd4', '#444441': '#c4c2b9',
+  '#5f5e5a': '#aaa89f', '#888780': '#918f87', '#2f6f62': '#3da58a',
+};
+function corTema(cor) {
+  if (!estaEscuro()) return cor;
+  return CORES_TEMA_ESCURO[String(cor).toLowerCase()] || cor;
+}
 // Gráficos em <canvas> não repintam sozinhos quando o tema muda — refaz os
 // que existem e redesenha a página visível, pra pegar as cores novas.
 window.addEventListener('temamudou', () => {
@@ -324,14 +337,91 @@ document.getElementById('next-month').addEventListener('click', () => {
   renderCalc();
 });
 
+/* Estar num mês que não é o de hoje "contamina" Período, Relatório e
+   Investimentos em silêncio (todos ancoram no mesmo cursor). O rótulo
+   destacado + botão "hoje" tornam o estado visível e a volta imediata —
+   antes, voltar de 8 meses atrás eram 8 cliques. */
+function mesEhAtual() {
+  const hoje = new Date();
+  return curMonth === hoje.getMonth() && curYear === hoje.getFullYear();
+}
+function atualizarIndicadorMes() {
+  const fora = !mesEhAtual();
+  document.getElementById('btn-hoje').style.display = fora ? 'inline-flex' : 'none';
+  document.getElementById('month-label').classList.toggle('mes-fora', fora);
+}
+document.getElementById('btn-hoje').addEventListener('click', () => {
+  const hoje = new Date();
+  curMonth = hoje.getMonth();
+  curYear = hoje.getFullYear();
+  renderCalc();
+});
+
+/* Aviso nas abas que ancoram no cursor de mês (Período/Relatório/
+   Investimentos): quando o cursor ficou num mês passado, essas telas
+   mostravam dados antigos sem nenhuma pista — parecia que os dados
+   recentes tinham sumido. */
+function renderAvisoMesRef(elId, rerender) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (mesEhAtual()) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <div class="aviso-mes-ref">
+      <span>Mostrando até <strong>${MONTHS[curMonth]} ${curYear}</strong> — o mês selecionado na Calculadora.</span>
+      <button type="button" class="btn">Usar o mês atual</button>
+    </div>`;
+  el.querySelector('button').addEventListener('click', () => {
+    const hoje = new Date();
+    curMonth = hoje.getMonth();
+    curYear = hoje.getFullYear();
+    rerender();
+  });
+}
+
+/* Conta recém-criada caía numa tela toda em R$ 0,00 sem nenhuma pista da
+   ordem das coisas — e o questionário de perfil (o melhor ponto de partida)
+   fica escondido na aba Perfil. Um cartão de boas-vindas de uso único
+   resolve; some sozinho assim que houver dados, perfil ou dispensa. */
+function renderOnboarding(md, renda) {
+  const el = document.getElementById('onboarding');
+  if (!el) return;
+  const temItens = md.cats.some(c => c.items.length > 0);
+  const mostrar = !localStorage.getItem('fin_onboarding_ok')
+    && !localStorage.getItem('fin_perfil')
+    && renda === 0 && !temItens;
+  if (!mostrar) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <div class="onboarding-card">
+      <div class="onboarding-titulo">Bem-vindo! Comece por aqui:</div>
+      <ol>
+        <li><strong>Responda o questionário de perfil</strong> — ele sugere como dividir sua renda entre as categorias, do seu jeito.</li>
+        <li><strong>Adicione sua renda do mês</strong> no cartão "Rendas do mês".</li>
+        <li><strong>Lance seus gastos</strong> dentro de cada categoria.</li>
+      </ol>
+      <div class="onboarding-acoes">
+        <button class="btn btn-primary" id="onboarding-perfil">Responder o questionário</button>
+        <button class="btn" id="onboarding-fechar">Agora não</button>
+      </div>
+    </div>`;
+  document.getElementById('onboarding-perfil').addEventListener('click', () => {
+    document.querySelector('.nav-item[data-page="profile"]')?.click();
+  });
+  document.getElementById('onboarding-fechar').addEventListener('click', () => {
+    localStorage.setItem('fin_onboarding_ok', '1');
+    el.innerHTML = '';
+  });
+}
+
 /* ══ CALCULADORA ══ */
 function renderCalc() {
   garantirParcelasDoMes(curMonth, curYear);
   const md = loadMonth(curMonth, curYear);
   document.getElementById('month-label').textContent = `${MONTHS[curMonth]} ${curYear}`;
+  atualizarIndicadorMes();
   const renda = totalRendas(md);
   md.renda = String(renda); // campo legado: Período/Relatório continuam lendo daqui
   document.getElementById('renda-total').textContent = fmt(renda);
+  renderOnboarding(md, renda);
   renderRendas(md);
   renderMetrics(md, renda);
   renderCategories(md, renda);
@@ -458,7 +548,7 @@ function renderCategories(md, renda) {
     div.className = 'category';
     div.innerHTML = `
       <div class="cat-header">
-        <span class="cat-dot" style="background:${def.color}"></span>
+        <span class="cat-dot" style="background:${corTema(def.color)}"></span>
         <span class="cat-name">${def.label}</span>
         <div class="cat-pct-wrap">
           <input class="cat-pct-input" type="number" min="0" max="100" step="1" value="${cat.pct}">
@@ -641,7 +731,7 @@ function renderPie(md, renda) {
         labels: [...CATS.map(c => c.label), 'Livre'],
         datasets: [{
           data: vals,
-          backgroundColor: [...CATS.map(c => c.color), LIVRE_COLOR],
+          backgroundColor: [...CATS.map(c => corTema(c.color)), LIVRE_COLOR],
           borderColor: corBordaSegmento(), borderWidth: estaEscuro() ? 1 : 0, hoverOffset: 4
         }]
       },
@@ -649,7 +739,7 @@ function renderPie(md, renda) {
         responsive: false, cutout: '62%',
         plugins: {
           legend: { display: false },
-          tooltip: { callbacks: { label: ctx => `${fmt(ctx.raw)} (${pct(ctx.raw, pieRenda)}% da renda)` } }
+          tooltip: { callbacks: { label: ctx => `${ctx.label}: ${fmt(ctx.raw)} (${pct(ctx.raw, pieRenda)}% da renda)` } }
         }
       }
     });
@@ -658,7 +748,7 @@ function renderPie(md, renda) {
   const rows = md.cats.map((cat, ci) => {
     const def = CATS[ci];
     return `<div class="leg-row">
-      <span class="leg-dot" style="background:${def.color}"></span>
+      <span class="leg-dot" style="background:${corTema(def.color)}"></span>
       <span class="leg-name">${def.label}</span>
       <span class="leg-val">${fmt(lancados[ci])}</span>
       <span class="leg-pct">${pct(lancados[ci], renda)}%</span>
@@ -676,11 +766,27 @@ function renderPie(md, renda) {
 }
 
 /* ── Sugestões de lançamentos recorrentes (detecção em recorrentes.js) ── */
+/* Sugestão dispensada não volta mais (guardado por categoria+nome
+   normalizado) — antes, um gasto cancelado (ex.: assinatura encerrada)
+   continuava sendo sugerido por meses e a única forma de "calar" o painel
+   era justamente lançar o item que a pessoa não queria lançar. */
+function recDispensados() {
+  try { return new Set(JSON.parse(localStorage.getItem('fin_rec_dispensados') || '[]')); }
+  catch { return new Set(); }
+}
+function dispensarRecorrente(catKey, nome) {
+  const set = recDispensados();
+  set.add(catKey + '|' + recNorm(nome));
+  localStorage.setItem('fin_rec_dispensados', JSON.stringify([...set]));
+}
+
 function renderRecorrentes() {
   const panel = document.getElementById('recorrentes-panel');
   if (!panel) return;
-  const sugs = (typeof detectarRecorrentes === 'function')
-    ? detectarRecorrentes(curMonth, curYear) : [];
+  const dispensados = recDispensados();
+  const sugs = ((typeof detectarRecorrentes === 'function')
+    ? detectarRecorrentes(curMonth, curYear) : [])
+    .filter(s => !dispensados.has(s.catKey + '|' + recNorm(s.name)));
   if (!sugs.length) { panel.style.display = 'none'; panel.innerHTML = ''; return; }
 
   const catDe = k => k === '__rendas'
@@ -695,12 +801,13 @@ function renderRecorrentes() {
       </div>
       ${sugs.map((s, i) => `
         <div class="rec-row">
-          <span class="rec-dot" style="background:${catDe(s.catKey).color}"></span>
+          <span class="rec-dot" style="background:${corTema(catDe(s.catKey).color)}"></span>
           <span class="rec-name">${esc(s.name)}</span>
           <span class="rec-tag">${s.tipo ? esc(s.tipo) : `repetiu ${s.meses}×`}</span>
           <span class="rec-cat">${esc(catDe(s.catKey).label)}</span>
           <span class="rec-val">${fmt(s.value)}</span>
           <button class="rec-add" data-i="${i}" title="Adicionar ao mês"><i class="ti ti-plus"></i></button>
+          <button class="rec-dismiss" data-i="${i}" title="Não vou ter mais esse gasto"><i class="ti ti-x"></i></button>
         </div>`).join('')}
     </div>`;
 
@@ -728,6 +835,12 @@ function renderRecorrentes() {
   };
   panel.querySelectorAll('.rec-add').forEach(b =>
     b.addEventListener('click', () => aplicar([sugs[parseInt(b.dataset.i)]])));
+  panel.querySelectorAll('.rec-dismiss').forEach(b =>
+    b.addEventListener('click', () => {
+      const s = sugs[parseInt(b.dataset.i)];
+      dispensarRecorrente(s.catKey, s.name);
+      renderRecorrentes();
+    }));
   document.getElementById('rec-add-all').addEventListener('click', () => aplicar(sugs));
 }
 
@@ -743,6 +856,7 @@ function getPeriodMonths(n) {
 }
 
 function renderPeriod() {
+  renderAvisoMesRef('aviso-mes-period', renderPeriod);
   const n = parseInt(document.getElementById('period-select').value);
   const months = getPeriodMonths(n);
   const labels = months.map(({m, y}) => MONTHS[m].slice(0,3) + '/' + String(y).slice(2));
@@ -781,21 +895,29 @@ function renderPeriod() {
 
   /* Bar chart */
   if (barChart) barChart.destroy();
+  // Eixo em "R$ 2,5 mil" (não "R$2k": o k é jargão e arredondar pra milhar
+  // inteiro repetia "R$1k, R$1k, R$2k, R$2k" pra rendas comuns).
+  const eixoDinheiro = v => v >= 1000
+    ? 'R$ ' + (v/1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' mil'
+    : 'R$ ' + v.toLocaleString('pt-BR');
+  const tooltipDinheiro = { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmt(ctx.raw)}` } };
+  const legenda = { display: true, position: 'bottom', labels: { font: { family: 'Inter', size: 11 }, color: corTextoGrafico(), boxWidth: 10, boxHeight: 10 } };
+
   barChart = new Chart(document.getElementById('barChart'), {
     type: 'bar',
     data: {
       labels,
       datasets: [
-        { label: 'Renda', data: rendas, backgroundColor: '#2C2C2A', borderColor: corBordaSegmento(), borderWidth: estaEscuro() ? 1 : 0 },
+        { label: 'Renda', data: rendas, backgroundColor: corTema('#2c2c2a'), borderColor: corBordaSegmento(), borderWidth: estaEscuro() ? 1 : 0 },
         { label: 'Gastos', data: gastos, backgroundColor: '#B4B2A9', borderColor: corBordaSegmento(), borderWidth: estaEscuro() ? 1 : 0 }
       ]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: { legend: legenda, tooltip: tooltipDinheiro },
       scales: {
-        x: { ticks: { font: { family: 'Inter', size: 11 }, color: corTextoGrafico(), autoSkip: false }, grid: { display: false } },
-        y: { ticks: { font: { family: 'Inter', size: 11 }, color: corTextoGrafico(), callback: v => 'R$' + (v/1000).toFixed(0) + 'k' }, grid: { color: corGradeGrafico() } }
+        x: { ticks: { font: { family: 'Inter', size: 11 }, color: corTextoGrafico(), maxRotation: 0 }, grid: { display: false } },
+        y: { ticks: { font: { family: 'Inter', size: 11 }, color: corTextoGrafico(), callback: eixoDinheiro }, grid: { color: corGradeGrafico() } }
       }
     }
   });
@@ -807,7 +929,7 @@ function renderPeriod() {
       const d = loadMonth(m, y);
       return d.cats[ci] ? d.cats[ci].items.reduce((s, it) => s + (parseFloat(it.value)||0), 0) : 0;
     }),
-    backgroundColor: def.color,
+    backgroundColor: corTema(def.color),
     borderColor: corBordaSegmento(), borderWidth: estaEscuro() ? 1 : 0,
   }));
 
@@ -817,10 +939,10 @@ function renderPeriod() {
     data: { labels, datasets: catDatasets },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: { legend: legenda, tooltip: tooltipDinheiro },
       scales: {
-        x: { stacked: true, ticks: { font: { family: 'Inter', size: 11 }, color: corTextoGrafico(), autoSkip: false }, grid: { display: false } },
-        y: { stacked: true, ticks: { font: { family: 'Inter', size: 11 }, color: corTextoGrafico(), callback: v => 'R$' + (v/1000).toFixed(0) + 'k' }, grid: { color: corGradeGrafico() } }
+        x: { stacked: true, ticks: { font: { family: 'Inter', size: 11 }, color: corTextoGrafico(), maxRotation: 0 }, grid: { display: false } },
+        y: { stacked: true, ticks: { font: { family: 'Inter', size: 11 }, color: corTextoGrafico(), callback: eixoDinheiro }, grid: { color: corGradeGrafico() } }
       }
     }
   });
@@ -830,6 +952,7 @@ document.getElementById('period-select').addEventListener('change', renderPeriod
 
 /* ══ RELATÓRIO ══ */
 function renderReport() {
+  renderAvisoMesRef('aviso-mes-report', renderReport);
   const n = parseInt(document.getElementById('report-period').value);
   const months = getPeriodMonths(n);
   const data = months.map(({m, y}) => ({ label: `${MONTHS[m].slice(0,3)}/${y}`, md: loadMonth(m, y), m, y }));
@@ -1096,7 +1219,12 @@ function aplicarPatrimonioReal(dados, todasClasses, classes, reserva, acumEmerg)
 
   const valEl = document.getElementById('inv-patrimonio-val');
   const subEl = document.getElementById('inv-patrimonio-sub');
-  if (valEl) valEl.textContent = fmt(patrimonioTotalVal);
+  if (valEl) {
+    valEl.textContent = fmt(patrimonioTotalVal);
+    // Verde só quando há ganho — número verde em cima de "perda projetada"
+    // fazia o verde significar nada.
+    valEl.className = 'metric-card-val ' + (rendimentoAcumulado >= 0 ? 'green' : 'red');
+  }
   if (subEl) {
     subEl.textContent = rendimentoAcumulado >= 0
       ? `${fmt(rendimentoAcumulado)} de rendimento`
@@ -1119,9 +1247,28 @@ function aplicarPatrimonioReal(dados, todasClasses, classes, reserva, acumEmerg)
     // passa undefined — não 0 — pra renderReserva cair no valor chapado real
     // (acumEmerg) em vez de exibir zero por engano.
     renderReserva(todasClasses, emerg, acumEmerg, infoReserva ? (ultimaReserva ? ultimaReserva.saldoFechamento : 0) : undefined);
+    preencherSaldosReais(porClasse, [reserva], '#inv-reserva');
   }
+  preencherSaldosReais(porClasse, classes, '#inv-classes');
 
   renderInvHistory(porMes);
+}
+
+/* Mostra no campo "Saldo real hoje" o valor que JÁ foi informado neste mês
+   — antes o campo renderizava sempre vazio e o usuário nunca sabia se tinha
+   preenchido nem qual valor estava valendo. Não mexe em campo que a pessoa
+   está digitando (só preenche se estiver vazio). */
+function preencherSaldosReais(porClasse, listaClasses, containerSel) {
+  const hoje = new Date();
+  const y = hoje.getFullYear(), m = hoje.getMonth() + 1;
+  const inputs = document.querySelectorAll(containerSel + ' .inv-saldo-real-input');
+  listaClasses.forEach((cls, i) => {
+    const input = inputs[i];
+    if (!input || input.value.trim() !== '' || document.activeElement === input) return;
+    const info = porClasse.get(cls.key);
+    const linha = info && info.evolucao.find(l => l.year === y && l.month === m && l.fonte === 'real');
+    if (linha) input.value = fmtCampoBR(linha.saldoFechamento);
+  });
 }
 
 /* Carteira da Meta (Fase C): desenho inicial chapado (igual ao padrão já
@@ -1139,7 +1286,7 @@ function renderInvestMeta(aporteMeta, acumMeta) {
 /* Substitui o patrimônio chapado da Meta pelo real (com juros) assim que
    chega — mesma ideia de aplicarPatrimonioReal, só que sem histórico/saldo
    por classe (a carteira da Meta é intencionalmente mais enxuta). */
-function aplicarPatrimonioRealMeta(dados) {
+function aplicarPatrimonioRealMeta(dados, classesMeta) {
   if (!dados) return;
   const { porClasse } = dados;
   let total = 0;
@@ -1149,12 +1296,14 @@ function aplicarPatrimonioRealMeta(dados) {
   });
   const el = document.getElementById('inv-meta-patrimonio-val');
   if (el) el.textContent = fmt(total);
+  if (classesMeta) preencherSaldosReais(porClasse, classesMeta, '#inv-classes-meta');
 }
 
 let invRenderSeq = 0; // trava contra resposta assíncrona desatualizada sobrescrever uma mais nova
 
 function renderInvest() {
   const meuSeq = ++invRenderSeq;
+  renderAvisoMesRef('aviso-mes-invest', renderInvest);
 
   // Classes padrão só existem "na memória" até serem salvas — sem isso, o
   // motor de rendimento nunca teria onde escrever o aporte do mês. Persiste
@@ -1244,7 +1393,7 @@ function renderInvest() {
     .then(() => carregarEvolucaoInvestimentos('meta'))
     .then(dados => {
       if (meuSeq !== invRenderSeq) return;
-      aplicarPatrimonioRealMeta(dados);
+      aplicarPatrimonioRealMeta(dados, classesMeta);
     })
     .catch(err => console.error('[invest] erro ao calcular patrimônio real da meta', err));
 }
@@ -1288,9 +1437,9 @@ function renderInvAporteRows(indep, emerg, total) {
   }
 
   container.innerHTML =
-    buildRows(catIndep, 'Independência Financeira', '#1a1a18') +
+    buildRows(catIndep, 'Independência Financeira', corTema('#1a1a18')) +
     '<div style="margin:8px 0;border-top:0.5px solid var(--border)"></div>' +
-    buildRows(catEmerg, 'Reserva de Emergência', '#888780') +
+    buildRows(catEmerg, 'Reserva de Emergência', corTema('#888780')) +
     (total > 0 ? `<div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;margin-top:4px">
       <span style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Total do mês</span>
       <span style="font-size:15px;font-weight:500">${fmt(total)}</span>
@@ -1321,6 +1470,9 @@ function ligarSaldoReal(container, classKey, portfolio) {
       await window.store.salvarSaldoReal(classKey, valor, portfolio);
       msg.textContent = 'Salvo ✓';
       msg.className = 'inv-saldo-real-msg ok';
+      // Recalcula o Patrimônio na tela — antes, o número só mudava saindo e
+      // voltando da aba, o que fazia parecer que o valor foi ignorado.
+      setTimeout(() => renderInvest(), 1200);
     } catch (err) {
       msg.textContent = 'Erro ao salvar — tente de novo';
       msg.className = 'inv-saldo-real-msg erro';
@@ -1350,7 +1502,7 @@ function renderInvClasses(todasClasses, aporte) {
     div.className = 'category';
     div.innerHTML = `
       <div class="cat-header" style="cursor:default">
-        <span class="cat-dot" style="background:${cls.color}"></span>
+        <span class="cat-dot" style="background:${corTema(cls.color)}"></span>
         <input class="item-name" type="text" value="${esc(cls.label)}" placeholder="Classe" style="font-size:12px;font-weight:500;max-width:130px">
         <div class="cat-pct-wrap" style="margin-left:auto">
           <input class="cat-pct-input" type="number" min="0" max="100" step="1" value="${cls.pct}">
@@ -1360,8 +1512,8 @@ function renderInvClasses(todasClasses, aporte) {
         <button class="del-btn" title="Remover"><i class="ti ti-x"></i></button>
       </div>
       <div class="inv-class-extra">
-        <label>Taxa esperada<input class="inv-aa-input" type="text" inputmode="decimal" value="${aaPct}"> % a.a.</label>
-        <label>Saldo real<input class="inv-saldo-real-input" type="text" inputmode="decimal" placeholder="Opcional"></label>
+        <label>Taxa esperada<input class="inv-aa-input" type="text" inputmode="decimal" value="${aaPct}"> % ao ano</label>
+        <label title="Quanto está valendo hoje na corretora/banco — corrige a projeção">Saldo real hoje<input class="inv-saldo-real-input" type="text" inputmode="decimal" placeholder="Opcional"></label>
         <span class="inv-saldo-real-msg"></span>
       </div>
     `;
@@ -1451,7 +1603,7 @@ function renderInvClassesMeta(classesMeta, aporte) {
     div.className = 'category';
     div.innerHTML = `
       <div class="cat-header" style="cursor:default">
-        <span class="cat-dot" style="background:${cls.color}"></span>
+        <span class="cat-dot" style="background:${corTema(cls.color)}"></span>
         <input class="item-name" type="text" value="${esc(cls.label)}" placeholder="Classe" style="font-size:12px;font-weight:500;max-width:130px">
         <div class="cat-pct-wrap" style="margin-left:auto">
           <input class="cat-pct-input" type="number" min="0" max="100" step="1" value="${cls.pct}">
@@ -1461,8 +1613,8 @@ function renderInvClassesMeta(classesMeta, aporte) {
         <button class="del-btn" title="Remover"><i class="ti ti-x"></i></button>
       </div>
       <div class="inv-class-extra">
-        <label>Taxa esperada<input class="inv-aa-input" type="text" inputmode="decimal" value="${aaPct}"> % a.a.</label>
-        <label>Saldo real<input class="inv-saldo-real-input" type="text" inputmode="decimal" placeholder="Opcional"></label>
+        <label>Taxa esperada<input class="inv-aa-input" type="text" inputmode="decimal" value="${aaPct}"> % ao ano</label>
+        <label title="Quanto está valendo hoje na corretora/banco — corrige a projeção">Saldo real hoje<input class="inv-saldo-real-input" type="text" inputmode="decimal" placeholder="Opcional"></label>
         <span class="inv-saldo-real-msg"></span>
       </div>
     `;
@@ -1547,8 +1699,8 @@ function renderReserva(todasClasses, aporteMes, acumEmerg, saldoReal) {
       </div>
     </div>
     <div class="inv-class-extra">
-      <label>Taxa esperada<input class="inv-aa-input" type="text" inputmode="decimal" value="${aaPct}"> % a.a.</label>
-      <label>Saldo real<input class="inv-saldo-real-input" type="text" inputmode="decimal" placeholder="Opcional"></label>
+      <label>Taxa esperada<input class="inv-aa-input" type="text" inputmode="decimal" value="${aaPct}"> % ao ano</label>
+      <label title="Quanto está valendo hoje na corretora/banco — corrige a projeção">Saldo real hoje<input class="inv-saldo-real-input" type="text" inputmode="decimal" placeholder="Opcional"></label>
       <span class="inv-saldo-real-msg"></span>
     </div>
   `;
@@ -1568,7 +1720,7 @@ function renderInvPie(classes, aporte) {
   // o aporte de verdade, mesmo se as % configuradas não somarem 100%.
   const somaPct = classes.reduce((s, c) => s + (parseFloat(c.pct) || 0), 0);
   const vals = classes.map(c => somaPct > 0 ? aporte * (parseFloat(c.pct)||0) / somaPct : 0);
-  const colors = classes.map(c => c.color);
+  const colors = classes.map(c => corTema(c.color));
   const totalVal = vals.reduce((s, v) => s + v, 0);
   document.getElementById('inv-chart-center').textContent = fmt(totalVal);
 
@@ -1588,7 +1740,7 @@ function renderInvPie(classes, aporte) {
         responsive: false, cutout: '62%',
         plugins: {
           legend: { display: false },
-          tooltip: { callbacks: { label: ctx => `${fmt(ctx.raw)} (${invAporteAtual > 0 ? Math.round(ctx.raw/invAporteAtual*100) : 0}%)` } }
+          tooltip: { callbacks: { label: ctx => `${ctx.label}: ${fmt(ctx.raw)} (${invAporteAtual > 0 ? Math.round(ctx.raw/invAporteAtual*100) : 0}%)` } }
         }
       }
     });
@@ -1596,7 +1748,7 @@ function renderInvPie(classes, aporte) {
 
   document.getElementById('inv-legend').innerHTML = classes.map((cls, ci) => `
     <div class="leg-row">
-      <span class="leg-dot" style="background:${cls.color}"></span>
+      <span class="leg-dot" style="background:${corTema(cls.color)}"></span>
       <span class="leg-name">${esc(cls.label)}</span>
       <span class="leg-val">${fmt(vals[ci])}</span>
       <span class="leg-pct">${parseFloat(cls.pct)||0}%</span>
@@ -1638,8 +1790,8 @@ function renderInvHistory(porMes) {
       <td class="num">${fmt(r.indep)}</td>
       <td class="num">${fmt(r.emerg)}</td>
       <td class="num">${fmt(r.total)}</td>
-      <td class="num ${r.rendimento === null ? '' : 'green'}">${r.rendimento === null ? '—' : fmt(r.rendimento)}</td>
-      <td class="num green">${fmt(r.patrimonio)}</td>
+      <td class="num ${r.rendimento === null ? '' : (r.rendimento < 0 ? 'red' : 'green')}">${r.rendimento === null ? '—' : fmt(r.rendimento)}</td>
+      <td class="num">${fmt(r.patrimonio)}</td>
     </tr>`).join('');
 }
 
@@ -1668,7 +1820,7 @@ function renderInvSaldoClasses(classes, acumTotal, porClasseReal) {
     const val = porClasseReal ? (porClasseReal.get(cls.key) || 0)
       : (somaPct > 0 ? acumTotal * pct2 / somaPct : 0);
     return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:0.5px solid var(--border)">
-      <span style="width:7px;height:7px;border-radius:50%;background:${cls.color};flex-shrink:0"></span>
+      <span style="width:7px;height:7px;border-radius:50%;background:${corTema(cls.color)};flex-shrink:0"></span>
       <span style="font-size:12px;color:var(--text2);flex:1">${esc(cls.label)}</span>
       <span style="font-size:12px;font-weight:500">${fmt(val)}</span>
       <span style="font-size:10px;color:var(--text3);min-width:28px;text-align:right">${pct2}%</span>
@@ -1887,6 +2039,16 @@ const PERFIL_CATS_LABEL = {
 const PERFIL_CATS_ORDEM = ['independencia', 'fixos', 'variaveis', 'conforto', 'emergencia', 'meta'];
 const PERFIL_MIX_LABEL = { renda_fixa: 'Renda Fixa', acoes: 'Ações', fii: 'FII', exterior: 'Internacional' };
 const PERFIL_MIX_ORDEM = ['renda_fixa', 'acoes', 'fii', 'exterior'];
+/* O perfil sai de uma cascata de prioridade (dívida > reserva > objetivo) —
+   sem a justificativa, quem respondia "objetivo: aposentadoria" mas tinha
+   dívida recebia "Saindo do Vermelho" e achava que o app ignorou a resposta. */
+const PERFIL_MOTIVO = {
+  saindo_do_vermelho: 'Você marcou que tem dívida com juros altos — quitar essa dívida rende mais que qualquer investimento, então ela vem primeiro.',
+  construindo_reserva: 'Sua reserva de emergência ainda não está completa — ela é a base que protege todo o resto do plano.',
+  objetivo_meta: 'Seu foco agora é juntar pra um objetivo específico, então uma fatia da renda vai direto pra ele, num investimento adequado ao prazo.',
+  acelerando_if: 'Sem dívida e com a reserva pronta, dá pra acelerar de verdade os investimentos de longo prazo.',
+  equilibrio: 'Distribuição equilibrada pra quem quer organizar as finanças sem um objetivo único no momento.',
+};
 
 function pctPadrao(key) {
   const raw = localStorage.getItem('fin_perfil');
@@ -1944,8 +2106,32 @@ function initPerfilForm() {
     marcar('objetivo', respostas.objetivo);
     marcar('metaHorizonte', respostas.metaHorizonte);
     marcar('risco', respostas.risco);
+    renderPerfilAtual(perfil);
   }
   atualizarVisibilidadeHorizonte();
+}
+
+/* Depois de aplicado, o perfil ativo precisa ser consultável — antes, a
+   única forma de rever qual perfil estava valendo era recalcular tudo. */
+function renderPerfilAtual(perfil) {
+  const el = document.getElementById('perfil-resultado');
+  if (!perfil || !perfil.perfilKey || !el || el.innerHTML.trim() !== '') return;
+  const base = (typeof PERFIS_BASE !== 'undefined') && PERFIS_BASE[perfil.perfilKey];
+  if (!base) return;
+  el.className = 'perfil-resultado';
+  el.innerHTML = `
+    <div class="perfil-resultado-titulo">Seu perfil atual: <strong>${base.label}</strong></div>
+    <p class="perfil-motivo">${PERFIL_MOTIVO[perfil.perfilKey] || ''}</p>
+    <div class="perfil-resultado-cats">
+      ${PERFIL_CATS_ORDEM.map(k => `
+        <div class="perfil-resultado-cat-row">
+          <span class="nome">${PERFIL_CATS_LABEL[k]}</span>
+          <span class="pct">${typeof perfil.cats_pct?.[k] === 'number' ? perfil.cats_pct[k] : '—'}%</span>
+        </div>
+      `).join('')}
+    </div>
+    <div class="perfil-resultado-reserva">Pra mudar, ajuste as respostas acima e clique em "Calcular meu perfil".</div>
+  `;
 }
 
 function renderPerfilResultado(resultado) {
@@ -1953,6 +2139,7 @@ function renderPerfilResultado(resultado) {
   el.className = 'perfil-resultado';
   el.innerHTML = `
     <div class="perfil-resultado-titulo">Seu perfil: <strong>${resultado.perfilLabel}</strong></div>
+    <p class="perfil-motivo">${PERFIL_MOTIVO[resultado.perfilKey] || ''}</p>
     <div class="perfil-resultado-cats">
       ${PERFIL_CATS_ORDEM.map(k => `
         <div class="perfil-resultado-cat-row">
