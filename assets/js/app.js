@@ -238,6 +238,48 @@ document.addEventListener('wheel', (e) => {
   if (el && el.tagName === 'INPUT' && el.type === 'number' && e.target === el) el.blur();
 }, { passive: true });
 
+/* ── Enter para fluir a digitação ── */
+/* O fluxo mais comum do app é lançar vários gastos em sequência — Enter
+   leva do nome pro valor e do valor pro próximo item, sem pegar o mouse.
+   No Perfil, Enter aciona o botão do formulário (igual à tela de login). */
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const t = e.target;
+  if (!t || t.tagName !== 'INPUT') return;
+  if (t.closest('#rendas') && t.classList.contains('item-name')) {
+    t.closest('.item-row')?.querySelector('.item-val')?.focus();
+    e.preventDefault();
+  } else if (t.closest('#rendas') && t.classList.contains('item-val')) {
+    t.blur();
+    document.getElementById('add-renda-btn')?.click();
+    e.preventDefault();
+  } else if (t.closest('#categories') && t.classList.contains('item-name')) {
+    t.closest('.item-row')?.querySelector('.item-val')?.focus();
+    e.preventDefault();
+  } else if (t.closest('#categories') && t.classList.contains('item-val')) {
+    const ci = t.dataset.ci;
+    t.blur();
+    document.querySelector(`#categories .add-item-btn[data-ci="${ci}"]`)?.click();
+    e.preventDefault();
+  } else if (t.id === 'profile-name' || t.id === 'profile-email') {
+    document.getElementById('btn-save-profile')?.click();
+    e.preventDefault();
+  } else if (t.id === 'profile-new-password' || t.id === 'profile-confirm-password') {
+    document.getElementById('btn-save-password')?.click();
+    e.preventDefault();
+  }
+});
+
+/* ── Recorrentes sem pular a página ── */
+/* O painel de sugestões fica ACIMA dos cartões; atualizá-lo a cada tecla
+   fazia a página inteira deslocar no meio da palavra quando o nome digitado
+   casava com uma sugestão. Espera a pessoa parar de digitar. */
+let recorrentesTimer = null;
+function renderRecorrentesDebounced() {
+  clearTimeout(recorrentesTimer);
+  recorrentesTimer = setTimeout(() => renderRecorrentes(), 1200);
+}
+
 /* ── Navigation ── */
 // No celular a barra lateral vira uma gaveta (ver main.css) — sem isso, não
 // haveria como trocar de página, já que os itens só existem dentro dela.
@@ -329,7 +371,7 @@ function renderRendas(md) {
     inp.addEventListener('input', e => {
       md.rendas[parseInt(e.target.dataset.i)].name = e.target.value;
       persistir();
-      renderRecorrentes(); // some da lista de sugestões o que o usuário acabou de digitar
+      renderRecorrentesDebounced(); // some da lista de sugestões, sem deslocar a página no meio da palavra
     });
   });
   container.querySelectorAll('.item-val').forEach(inp => {
@@ -468,17 +510,43 @@ function renderCategories(md, renda) {
       sessionStorage.setItem('cat_' + def.key, was ? '0' : '1');
     });
 
+    // Atualização parcial de propósito: chamar renderCalc() aqui destruía o
+    // campo no meio da edição — o foco caía no body, Tab não ia pro próximo
+    // campo e a setinha do spinner só funcionava um clique. Sem rebuild,
+    // digitação, Tab e setas funcionam como em qualquer formulário.
     div.querySelector('.cat-pct-input').addEventListener('change', e => {
-      md.cats[ci].pct = parseFloat(e.target.value) || 0;
+      const bruto = e.target.value.trim();
+      if (bruto === '' || isNaN(parseFloat(bruto))) {
+        e.target.value = md.cats[ci].pct; // vazio/lixo não apaga a meta que existia
+        return;
+      }
+      const clamped = Math.min(100, Math.max(0, parseFloat(bruto)));
+      e.target.value = clamped;
+      md.cats[ci].pct = clamped;
       saveMonth(curMonth, curYear, md);
-      renderCalc();
+      const renda = totalRendas(md);
+      // Refaz só os números afetados pela meta, sem tocar nos inputs:
+      const alocadoNovo = renda * clamped / 100;
+      const lancadoCat = md.cats[ci].items.reduce((s, it) => s + (parseFloat(it.value)||0), 0);
+      div.querySelector('.cat-value').innerHTML = `${fmt(lancadoCat)}<span class="cat-value-meta"> / ${fmt(alocadoNovo)}</span>`;
+      const resumo = div.querySelector('.cat-summary');
+      if (resumo) resumo.textContent = `Lançado: ${fmt(lancadoCat)} / ${fmt(alocadoNovo)} (${pct(lancadoCat, alocadoNovo)}%)`;
+      const totalPctNovo = md.cats.reduce((s, c) => s + (parseFloat(c.pct)||0), 0);
+      document.getElementById('pct-total-lbl').textContent = `Meta: ${totalPctNovo.toFixed(0)}%`;
+      const warnEl = document.getElementById('pct-warning');
+      if (totalPctNovo > 100.01) {
+        warnEl.style.display = 'block';
+        warnEl.innerHTML = `<div class="pct-warning">⚠ Metas somam ${totalPctNovo.toFixed(0)}% — acima de 100% da renda</div>`;
+      } else { warnEl.style.display = 'none'; }
+      renderMetrics(md, renda);
+      renderPie(md, renda);
     });
 
     div.querySelectorAll('.item-name').forEach(inp => {
       inp.addEventListener('input', e => {
         md.cats[parseInt(e.target.dataset.ci)].items[parseInt(e.target.dataset.ii)].name = e.target.value;
         saveMonth(curMonth, curYear, md);
-        renderRecorrentes(); // some da lista de sugestões o que o usuário acabou de digitar
+        renderRecorrentesDebounced(); // some da lista de sugestões, sem deslocar a página no meio da palavra
       });
     });
     div.querySelectorAll('.item-val').forEach(inp => {
@@ -517,21 +585,21 @@ function renderCategories(md, renda) {
         renderCalc();
       });
     });
+    // 'input' + badge direto (sem renderCalc): o rebuild derrubava o foco no
+    // meio do "parcela X de Y" e quebrava o Tab entre os dois campos.
+    const atualizarParcela = (e, campo) => {
+      const it = md.cats[parseInt(e.target.dataset.ci)].items[parseInt(e.target.dataset.ii)];
+      if (e.target.value.trim() === '') return; // deixa terminar de digitar
+      it.parcela[campo] = Math.max(1, parseInt(e.target.value) || 1);
+      saveMonth(curMonth, curYear, md);
+      const badge = e.target.closest('.item-block')?.querySelector('.item-parcela-badge');
+      if (badge) badge.textContent = `${it.parcela.atual}/${it.parcela.total}`;
+    };
     div.querySelectorAll('.item-parcela-atual').forEach(inp => {
-      inp.addEventListener('change', e => {
-        const it = md.cats[parseInt(e.target.dataset.ci)].items[parseInt(e.target.dataset.ii)];
-        it.parcela.atual = Math.max(1, parseInt(e.target.value) || 1);
-        saveMonth(curMonth, curYear, md);
-        renderCalc();
-      });
+      inp.addEventListener('input', e => atualizarParcela(e, 'atual'));
     });
     div.querySelectorAll('.item-parcela-total').forEach(inp => {
-      inp.addEventListener('change', e => {
-        const it = md.cats[parseInt(e.target.dataset.ci)].items[parseInt(e.target.dataset.ii)];
-        it.parcela.total = Math.max(1, parseInt(e.target.value) || 1);
-        saveMonth(curMonth, curYear, md);
-        renderCalc();
-      });
+      inp.addEventListener('input', e => atualizarParcela(e, 'total'));
     });
     div.querySelectorAll('.add-item-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -540,6 +608,10 @@ function renderCategories(md, renda) {
         saveMonth(curMonth, curYear, md);
         sessionStorage.setItem('cat_' + CATS[ci2].key, '1');
         renderCalc();
+        // Cursor direto no campo novo — igual ao "Adicionar renda"; sem
+        // isso, todo lançamento exigia um clique extra pra começar a digitar.
+        const nomes = document.querySelectorAll(`#categories .item-name[data-ci="${ci2}"]`);
+        if (nomes.length) nomes[nomes.length - 1].focus();
       });
     });
 
@@ -1300,9 +1372,15 @@ function renderInvClasses(todasClasses, aporte) {
       renderInvSaldoClasses(classes, null);
     });
     div.querySelector('.cat-pct-input').addEventListener('change', e => {
-      cls.pct = parseFloat(e.target.value) || 0;
+      const bruto = e.target.value.trim();
+      if (bruto === '' || isNaN(parseFloat(bruto))) { e.target.value = cls.pct; return; }
+      cls.pct = Math.min(100, Math.max(0, parseFloat(bruto)));
       saveInvClasses(todasClasses);
+      const idx = classes.indexOf(cls);
       renderInvest();
+      // O rebuild derruba o foco — devolve pro mesmo campo pra edição em
+      // sequência (ajustar as 4 classes) não exigir um clique por campo.
+      document.querySelectorAll('#inv-classes .cat-pct-input')[idx]?.focus();
     });
     div.querySelector('.inv-aa-input').addEventListener('change', e => {
       const taxa = parseValorBR(e.target.value);
@@ -1345,6 +1423,10 @@ function renderInvClasses(todasClasses, aporte) {
     todasClasses.push({ key: 'cls_' + Date.now(), label: 'Nova classe', pct: 0, color: palette[classes.length % palette.length], aa: 0 });
     saveInvClasses(todasClasses);
     renderInvest();
+    // Nome placeholder já selecionado: digitar substitui direto, sem
+    // precisar clicar + selecionar tudo + apagar.
+    const nomes = document.querySelectorAll('#inv-classes .item-name');
+    if (nomes.length) { nomes[nomes.length - 1].focus(); nomes[nomes.length - 1].select(); }
   });
 }
 
@@ -1389,9 +1471,13 @@ function renderInvClassesMeta(classesMeta, aporte) {
       saveInvClassesMeta(classesMeta);
     });
     div.querySelector('.cat-pct-input').addEventListener('change', e => {
-      cls.pct = parseFloat(e.target.value) || 0;
+      const bruto = e.target.value.trim();
+      if (bruto === '' || isNaN(parseFloat(bruto))) { e.target.value = cls.pct; return; }
+      cls.pct = Math.min(100, Math.max(0, parseFloat(bruto)));
       saveInvClassesMeta(classesMeta);
+      const idx = classesMeta.indexOf(cls);
       renderInvest();
+      document.querySelectorAll('#inv-classes-meta .cat-pct-input')[idx]?.focus();
     });
     div.querySelector('.inv-aa-input').addEventListener('change', e => {
       const taxa = parseValorBR(e.target.value);
@@ -1434,6 +1520,8 @@ function renderInvClassesMeta(classesMeta, aporte) {
     classesMeta.push({ key: 'cls_' + Date.now(), label: 'Nova classe', pct: 0, color: palette[classesMeta.length % palette.length], aa: 0 });
     saveInvClassesMeta(classesMeta);
     renderInvest();
+    const nomes = document.querySelectorAll('#inv-classes-meta .item-name');
+    if (nomes.length) { nomes[nomes.length - 1].focus(); nomes[nomes.length - 1].select(); }
   });
 }
 
