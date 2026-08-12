@@ -98,8 +98,6 @@ function garantirParcelasDoMes(m, y) {
   if (mudou) saveMonth(m, y, d);
 }
 function saveMonth(m, y, d) { localStorage.setItem('fin_' + mKey(m, y), JSON.stringify(d)); }
-function getApiKey() { return localStorage.getItem('fin_api_key') || ''; }
-function setApiKey(k) { localStorage.setItem('fin_api_key', k); }
 
 /* ── Formatting ── */
 function fmt(v) {
@@ -107,11 +105,138 @@ function fmt(v) {
   return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 function pct(a, b) { return b > 0 ? Math.round(a / b * 100) : 0; }
+
+/* Converte o que o brasileiro digita num campo de dinheiro para número.
+   Aceita "1.240,33", "1240,33", "1240.33", "1240" e "R$ 1.240,33".
+   Regras de separador: vírgula é SEMPRE decimal; ponto é decimal quando é o
+   único separador e tem 1-2 dígitos depois (é como os valores já salvos
+   estão gravados: "1240.33"), e é separador de milhar em qualquer outro
+   caso ("1.240" → 1240, "1.240.500" → 1240500, "1.240,33" → 1240.33).
+   Retorna NaN para entrada que não é número (para o chamador decidir
+   avisar), e 0 para vazio. */
+function parseValorBR(str) {
+  // Separador solto no fim ("1240," no meio da digitação) é número em
+  // progresso, não erro — trata como se ainda não tivesse decimais.
+  const s = String(str ?? '').replace(/[R$\s]/g, '').replace(/[.,]$/, '');
+  if (s === '') return 0;
+  const posV = s.lastIndexOf(','), posP = s.lastIndexOf('.');
+  let normalizado;
+  if (posV >= 0 && posP >= 0) {
+    // Vírgula E ponto presentes: o que aparece POR ÚLTIMO é o decimal.
+    // Cobre tanto "1.240,56" (brasileiro) quanto "1,240.56" colado de
+    // fonte gringa — antes, o colado virava R$ 1,24 sem aviso.
+    const dec = posV > posP ? ',' : '.';
+    const semMilhar = s.split(dec === ',' ? '.' : ',').join('');
+    if (semMilhar.split(dec).length > 2) return NaN; // decimal repetido
+    normalizado = semMilhar.replace(dec, '.');
+  } else if (posV >= 0) {
+    if (s.indexOf(',') !== posV) return NaN; // mais de uma vírgula é erro
+    normalizado = s.replace(',', '.');
+  } else if (posP >= 0) {
+    const umPontoSo = s.indexOf('.') === posP;
+    const digitosApos = s.length - posP - 1;
+    if (digitosApos <= 2) {
+      // Último ponto com 1-2 dígitos depois é decimal — vale pro formato
+      // interno salvo ("1240.33") e pro erro comum de digitar milhar e
+      // decimal com ponto ("1.000.00" → 1000, não 100000).
+      normalizado = s.slice(0, posP).split('.').join('') + '.' + s.slice(posP + 1);
+    } else if (umPontoSo && /^0+\./.test(s)) {
+      normalizado = s; // "0.125" só pode ser decimal
+    } else {
+      normalizado = s.split('.').join(''); // pontos de milhar ("1.240")
+    }
+  } else {
+    normalizado = s;
+  }
+  if (!/^-?\d*\.?\d+$/.test(normalizado)) return NaN;
+  return parseFloat(normalizado);
+}
+
+/* Formata um número (ou string canônica "1240.33") para exibição no campo:
+   "1.240,33". Vazio/zero-por-vazio continua vazio (não força "0,00" num
+   campo que o usuário deixou em branco). */
+function fmtCampoBR(v) {
+  if (v === '' || v === null || v === undefined) return '';
+  const n = parseFloat(v);
+  if (!isFinite(n)) return '';
+  return n.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+/* Liga o comportamento de campo de dinheiro brasileiro num <input type=text
+   inputmode=decimal>: no 'input' converte o texto pro valor canônico
+   (string com ponto decimal, como sempre foi salvo) e entrega ao onValor;
+   entrada não-numérica marca o campo em vermelho e entrega '' (nunca salva
+   lixo silenciosamente). No blur, reformata bonito ("1.240,33"). */
+function ligarCampoDinheiro(input, onValor) {
+  // Entrada inválida NÃO sobrescreve o valor bom que já estava salvo — só
+  // marca o campo; no blur, o campo volta pro último valor válido. (Gravar
+  // '' num vacilo de tecla apagaria o valor em todos os aparelhos.)
+  const inicial = parseValorBR(input.value);
+  let ultimoValido = (isNaN(inicial) || input.value.trim() === '') ? '' : String(inicial);
+  input.addEventListener('input', () => {
+    const n = parseValorBR(input.value);
+    if (isNaN(n) || n < 0) {
+      input.classList.add('campo-invalido');
+      return;
+    }
+    input.classList.remove('campo-invalido');
+    ultimoValido = input.value.trim() === '' ? '' : String(n);
+    onValor(ultimoValido);
+  });
+  input.addEventListener('blur', () => {
+    const n = parseValorBR(input.value);
+    if (isNaN(n) || n < 0) {
+      input.value = fmtCampoBR(ultimoValido);
+      input.classList.remove('campo-invalido');
+    } else if (input.value.trim() !== '') {
+      input.value = fmtCampoBR(n);
+    }
+  });
+}
 /* Escapa texto do usuário antes de entrar em innerHTML/atributos */
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
+
+/* ── Desfazer (toast) ── */
+/* Apagar é irreversível demais pra não ter rede de segurança, mas modal de
+   confirmação em toda exclusão cansa — o meio-termo é apagar na hora e
+   oferecer "Desfazer" por alguns segundos. Um toast por vez (o mais novo
+   substitui o anterior). */
+let desfazerTimer = null;
+function oferecerDesfazer(mensagem, aoDesfazer) {
+  let toast = document.getElementById('undo-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'undo-toast';
+    toast.className = 'undo-toast';
+    document.body.appendChild(toast);
+  }
+  clearTimeout(desfazerTimer);
+  toast.innerHTML = `<span class="undo-toast-msg"></span><button class="undo-toast-btn" type="button">Desfazer</button>`;
+  toast.querySelector('.undo-toast-msg').textContent = mensagem;
+  toast.classList.add('visivel');
+  toast.querySelector('.undo-toast-btn').addEventListener('click', () => {
+    clearTimeout(desfazerTimer);
+    toast.classList.remove('visivel');
+    aoDesfazer();
+  });
+  desfazerTimer = setTimeout(() => toast.classList.remove('visivel'), 6000);
+}
+
+/* ── Proteção contra a roda do mouse em campos numéricos ── */
+/* Rolar a página com o cursor sobre um <input type=number> focado muda o
+   valor silenciosamente (e o app salva na hora) — num app de dinheiro isso
+   corrompe dados sem ninguém perceber. Tirar o foco no momento do scroll
+   preserva a rolagem e impede a mudança. Os campos de dinheiro já viraram
+   type=text (imunes); isso cobre os de % e parcela que continuam number. */
+document.addEventListener('wheel', (e) => {
+  // Só quando a roda gira EM CIMA do campo focado — é aí que o navegador
+  // mudaria o valor. Rolar a página em outro lugar não pode roubar o foco.
+  const el = document.activeElement;
+  if (el && el.tagName === 'INPUT' && el.type === 'number' && e.target === el) el.blur();
+}, { passive: true });
 
 /* ── Navigation ── */
 // No celular a barra lateral vira uma gaveta (ver main.css) — sem isso, não
@@ -180,7 +305,7 @@ function renderRendas(md) {
     ${md.rendas.map((r, i) => `
       <div class="item-row">
         <input class="item-name" type="text" placeholder="Ex.: Salário" value="${esc(r.name)}" data-i="${i}">
-        <input class="item-val" type="number" placeholder="0" min="0" value="${esc(r.value)}" data-i="${i}">
+        <input class="item-val" type="text" inputmode="decimal" placeholder="0,00" value="${esc(fmtCampoBR(r.value))}" data-i="${i}">
         <button class="del-btn" data-i="${i}"><i class="ti ti-x"></i></button>
       </div>`).join('')}
     <button class="add-item-btn" id="add-renda-btn"><i class="ti ti-plus"></i> Adicionar renda</button>
@@ -208,17 +333,30 @@ function renderRendas(md) {
     });
   });
   container.querySelectorAll('.item-val').forEach(inp => {
-    inp.addEventListener('input', e => {
-      md.rendas[parseInt(e.target.dataset.i)].value = e.target.value;
+    ligarCampoDinheiro(inp, valor => {
+      md.rendas[parseInt(inp.dataset.i)].value = valor;
       persistir();
       atualizarValores();
     });
   });
   container.querySelectorAll('.del-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      md.rendas.splice(parseInt(btn.dataset.i), 1);
+      const i = parseInt(btn.dataset.i);
+      const removida = md.rendas[i];
+      md.rendas.splice(i, 1);
       persistir();
       renderCalc();
+      // Prende o mês do momento da exclusão — o usuário pode navegar pra
+      // outro mês nos 6s do toast, e o desfazer precisa devolver a renda
+      // pro mês de onde ela saiu, não pro mês que estiver na tela.
+      const mDel = curMonth, yDel = curYear;
+      oferecerDesfazer(`Renda "${removida.name || 'sem nome'}" apagada`, () => {
+        const mdAtual = loadMonth(mDel, yDel);
+        mdAtual.rendas.splice(Math.min(i, mdAtual.rendas.length), 0, removida);
+        mdAtual.renda = String(totalRendas(mdAtual));
+        saveMonth(mDel, yDel, mdAtual);
+        renderCalc();
+      });
     });
   });
   document.getElementById('add-renda-btn').addEventListener('click', () => {
@@ -299,7 +437,7 @@ function renderCategories(md, renda) {
             <div class="item-row">
               <input class="item-name" type="text" placeholder="Descrição" value="${esc(it.name)}" data-ci="${ci}" data-ii="${ii}">
               ${temParcela ? `<span class="item-parcela-badge">${pAtual}/${pTotal}</span>` : ''}
-              <input class="item-val" type="number" placeholder="0" min="0" value="${it.value||''}" data-ci="${ci}" data-ii="${ii}">
+              <input class="item-val" type="text" inputmode="decimal" placeholder="0,00" value="${esc(fmtCampoBR(it.value))}" data-ci="${ci}" data-ii="${ii}">
               ${CATS_COM_PARCELA.has(def.key) ? `<button class="item-parcela-toggle ${temParcela ? 'active' : ''}" data-ci="${ci}" data-ii="${ii}" title="É parcelado?"><i class="ti ti-calendar"></i></button>` : ''}
               <button class="del-btn" data-ci="${ci}" data-ii="${ii}"><i class="ti ti-x"></i></button>
             </div>
@@ -344,8 +482,8 @@ function renderCategories(md, renda) {
       });
     });
     div.querySelectorAll('.item-val').forEach(inp => {
-      inp.addEventListener('input', e => {
-        md.cats[parseInt(e.target.dataset.ci)].items[parseInt(e.target.dataset.ii)].value = e.target.value;
+      ligarCampoDinheiro(inp, valor => {
+        md.cats[parseInt(inp.dataset.ci)].items[parseInt(inp.dataset.ii)].value = valor;
         saveMonth(curMonth, curYear, md);
         renderPie(md, parseFloat(md.renda)||0);
         renderMetrics(md, parseFloat(md.renda)||0);
@@ -353,9 +491,21 @@ function renderCategories(md, renda) {
     });
     div.querySelectorAll('.del-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        md.cats[parseInt(btn.dataset.ci)].items.splice(parseInt(btn.dataset.ii), 1);
+        const ci2 = parseInt(btn.dataset.ci), ii2 = parseInt(btn.dataset.ii);
+        const removido = md.cats[ci2].items[ii2];
+        md.cats[ci2].items.splice(ii2, 1);
         saveMonth(curMonth, curYear, md);
         renderCalc();
+        // Mesmo cuidado da renda: o desfazer devolve o item pro mês de onde
+        // ele saiu, mesmo se o usuário navegar pra outro mês nesse meio tempo.
+        const mDel = curMonth, yDel = curYear;
+        oferecerDesfazer(`Item "${removido.name || 'sem nome'}" apagado`, () => {
+          const mdAtual = loadMonth(mDel, yDel);
+          const cat2 = mdAtual.cats[ci2];
+          if (cat2) cat2.items.splice(Math.min(ii2, cat2.items.length), 0, removido);
+          saveMonth(mDel, yDel, mdAtual);
+          renderCalc();
+        });
       });
     });
     div.querySelectorAll('.item-parcela-toggle').forEach(btn => {
@@ -1083,8 +1233,16 @@ function ligarSaldoReal(container, classKey, portfolio) {
   const input = container.querySelector('.inv-saldo-real-input');
   const msg = container.querySelector('.inv-saldo-real-msg');
   input.addEventListener('change', async e => {
-    const valor = parseFloat(e.target.value);
-    if (!(valor >= 0)) { msg.textContent = ''; return; }
+    if (e.target.value.trim() === '') { msg.textContent = ''; return; }
+    const valor = parseValorBR(e.target.value);
+    // Entrada que não vira número (ou negativa) precisa de resposta — sumir
+    // em silêncio faz o usuário achar que o patrimônio foi registrado.
+    if (isNaN(valor) || valor < 0) {
+      msg.textContent = 'Valor inválido — use números, ex.: 1.240,33';
+      msg.className = 'inv-saldo-real-msg erro';
+      return;
+    }
+    e.target.value = fmtCampoBR(valor);
     msg.textContent = 'Salvando...';
     msg.className = 'inv-saldo-real-msg';
     try {
@@ -1115,7 +1273,7 @@ function renderInvClasses(todasClasses, aporte) {
     // acima é só um alerta, nunca impediu o usuário de salvar acima/abaixo
     // de 100%, então o valor exibido precisa bater com o que é gravado.
     const val = totalPct > 0 ? aporte * (parseFloat(cls.pct)||0) / totalPct : 0;
-    const aaPct = ((parseFloat(cls.aa)||0) * 100).toFixed(2);
+    const aaPct = fmtCampoBR((parseFloat(cls.aa)||0) * 100);
     const div = document.createElement('div');
     div.className = 'category';
     div.innerHTML = `
@@ -1130,8 +1288,8 @@ function renderInvClasses(todasClasses, aporte) {
         <button class="del-btn" title="Remover"><i class="ti ti-x"></i></button>
       </div>
       <div class="inv-class-extra">
-        <label>Taxa esperada<input class="inv-aa-input" type="number" step="0.1" value="${aaPct}"> % a.a.</label>
-        <label>Saldo real<input class="inv-saldo-real-input" type="number" min="0" step="0.01" placeholder="Opcional"></label>
+        <label>Taxa esperada<input class="inv-aa-input" type="text" inputmode="decimal" value="${aaPct}"> % a.a.</label>
+        <label>Saldo real<input class="inv-saldo-real-input" type="text" inputmode="decimal" placeholder="Opcional"></label>
         <span class="inv-saldo-real-msg"></span>
       </div>
     `;
@@ -1147,7 +1305,10 @@ function renderInvClasses(todasClasses, aporte) {
       renderInvest();
     });
     div.querySelector('.inv-aa-input').addEventListener('change', e => {
-      cls.aa = (parseFloat(e.target.value) || 0) / 100;
+      const taxa = parseValorBR(e.target.value);
+      if (isNaN(taxa)) return; // não sobrescreve a taxa com lixo
+      cls.aa = taxa / 100;
+      e.target.value = fmtCampoBR(taxa);
       saveInvClasses(todasClasses);
     });
     div.querySelector('.del-btn').addEventListener('click', () => {
@@ -1162,6 +1323,14 @@ function renderInvClasses(todasClasses, aporte) {
       if (idx >= 0) todasClasses.splice(idx, 1);
       saveInvClasses(todasClasses);
       renderInvest();
+      oferecerDesfazer(`Classe "${cls.label}" removida`, () => {
+        const atuais = loadInvClasses();
+        if (!atuais.some(c => c.key === cls.key)) {
+          atuais.splice(Math.min(idx, atuais.length), 0, cls);
+          saveInvClasses(atuais);
+        }
+        renderInvest();
+      });
     });
     ligarSaldoReal(div, cls.key, 'independencia');
     container.appendChild(div);
@@ -1195,7 +1364,7 @@ function renderInvClassesMeta(classesMeta, aporte) {
   container.innerHTML = '';
   classesMeta.forEach(cls => {
     const val = totalPct > 0 ? aporte * (parseFloat(cls.pct)||0) / totalPct : 0;
-    const aaPct = ((parseFloat(cls.aa)||0) * 100).toFixed(2);
+    const aaPct = fmtCampoBR((parseFloat(cls.aa)||0) * 100);
     const div = document.createElement('div');
     div.className = 'category';
     div.innerHTML = `
@@ -1210,8 +1379,8 @@ function renderInvClassesMeta(classesMeta, aporte) {
         <button class="del-btn" title="Remover"><i class="ti ti-x"></i></button>
       </div>
       <div class="inv-class-extra">
-        <label>Taxa esperada<input class="inv-aa-input" type="number" step="0.1" value="${aaPct}"> % a.a.</label>
-        <label>Saldo real<input class="inv-saldo-real-input" type="number" min="0" step="0.01" placeholder="Opcional"></label>
+        <label>Taxa esperada<input class="inv-aa-input" type="text" inputmode="decimal" value="${aaPct}"> % a.a.</label>
+        <label>Saldo real<input class="inv-saldo-real-input" type="text" inputmode="decimal" placeholder="Opcional"></label>
         <span class="inv-saldo-real-msg"></span>
       </div>
     `;
@@ -1225,7 +1394,10 @@ function renderInvClassesMeta(classesMeta, aporte) {
       renderInvest();
     });
     div.querySelector('.inv-aa-input').addEventListener('change', e => {
-      cls.aa = (parseFloat(e.target.value) || 0) / 100;
+      const taxa = parseValorBR(e.target.value);
+      if (isNaN(taxa)) return; // não sobrescreve a taxa com lixo
+      cls.aa = taxa / 100;
+      e.target.value = fmtCampoBR(taxa);
       saveInvClassesMeta(classesMeta);
     });
     div.querySelector('.del-btn').addEventListener('click', () => {
@@ -1240,6 +1412,14 @@ function renderInvClassesMeta(classesMeta, aporte) {
       if (idx >= 0) classesMeta.splice(idx, 1);
       saveInvClassesMeta(classesMeta);
       renderInvest();
+      oferecerDesfazer(`Classe "${cls.label}" removida`, () => {
+        const atuais = loadInvClassesMeta();
+        if (!atuais.some(c => c.key === cls.key)) {
+          atuais.splice(Math.min(idx, atuais.length), 0, cls);
+          saveInvClassesMeta(atuais);
+        }
+        renderInvest();
+      });
     });
     ligarSaldoReal(div, cls.key, 'meta');
     container.appendChild(div);
@@ -1264,7 +1444,7 @@ function renderReserva(todasClasses, aporteMes, acumEmerg, saldoReal) {
   if (!container) return;
   const reserva = classeReserva(todasClasses);
   if (!reserva) { container.innerHTML = ''; return; }
-  const aaPct = ((parseFloat(reserva.aa)||0) * 100).toFixed(2);
+  const aaPct = fmtCampoBR((parseFloat(reserva.aa)||0) * 100);
   const acumExibido = (saldoReal === null || saldoReal === undefined) ? acumEmerg : saldoReal;
 
   container.innerHTML = `
@@ -1279,13 +1459,16 @@ function renderReserva(todasClasses, aporteMes, acumEmerg, saldoReal) {
       </div>
     </div>
     <div class="inv-class-extra">
-      <label>Taxa esperada<input class="inv-aa-input" type="number" step="0.1" value="${aaPct}"> % a.a.</label>
-      <label>Saldo real<input class="inv-saldo-real-input" type="number" min="0" step="0.01" placeholder="Opcional"></label>
+      <label>Taxa esperada<input class="inv-aa-input" type="text" inputmode="decimal" value="${aaPct}"> % a.a.</label>
+      <label>Saldo real<input class="inv-saldo-real-input" type="text" inputmode="decimal" placeholder="Opcional"></label>
       <span class="inv-saldo-real-msg"></span>
     </div>
   `;
   container.querySelector('.inv-aa-input').addEventListener('change', e => {
-    reserva.aa = (parseFloat(e.target.value) || 0) / 100;
+    const taxa = parseValorBR(e.target.value);
+    if (isNaN(taxa)) return; // não sobrescreve a taxa com lixo
+    reserva.aa = taxa / 100;
+    e.target.value = fmtCampoBR(taxa);
     saveInvClasses(todasClasses);
   });
   ligarSaldoReal(container, reserva.key, 'independencia');
@@ -1776,6 +1959,7 @@ document.getElementById('confirm-cancel').addEventListener('click', () => {
   document.getElementById('confirm-overlay').classList.remove('open');
 });
 document.getElementById('confirm-logout').addEventListener('click', async () => {
+  window._logoutIntencional = true; // ver aviso de sessão expirada no store.js
   await db.auth.signOut();
   window.location.href = 'index.html';
 });

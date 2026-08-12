@@ -25,6 +25,23 @@
   let userId = null;
   const pending = new Set();
   let flushTimer = null;
+  let flushing = false;
+
+  /* A fila pendente sobrevive a fechar a aba: sem isso, uma edição que não
+     subiu (rede caiu, celular matou a aba, sessão venceu) ficava órfã — e o
+     pull do próximo login sobrescrevia o localStorage com a versão antiga
+     da nuvem, apagando a edição até do aparelho. Com a fila persistida, o
+     init() empurra as pendências ANTES de puxar, e o pull pula essas chaves. */
+  const PENDING_KEY = "fin_pending_sync";
+  function persistPending() {
+    nativeSetItem(PENDING_KEY, JSON.stringify([...pending]));
+  }
+  function restorePending() {
+    try {
+      const arr = JSON.parse(localStorage.getItem(PENDING_KEY) || "[]");
+      if (Array.isArray(arr)) arr.forEach((k) => { if (typeof k === "string") pending.add(k); });
+    } catch { /* fila corrompida: ignora */ }
+  }
 
   function monthFromKey(k) {
     const m = k.match(MONTH_RE);
@@ -61,6 +78,9 @@
 
     (months || []).forEach((row) => {
       const key = `fin_${row.year}-${String(row.month).padStart(2, "0")}`;
+      // Chave com edição local ainda não enviada: o local é mais novo que a
+      // nuvem — sobrescrever aqui apagaria a edição pendente do usuário.
+      if (pending.has(key)) return;
       const value = {
         renda: row.renda ? String(row.renda) : "",
         cats: (row.payload && row.payload.cats) || [],
@@ -84,11 +104,11 @@
       const porPortfolio = (p) => classes.filter((c) => (c.portfolio || "independencia") === p);
       const indep = porPortfolio("independencia");
       const meta = porPortfolio("meta");
-      if (indep.length) nativeSetItem(INV_KEY, JSON.stringify(indep.filter((c) => !c.archived).map(toRow)));
-      if (meta.length) nativeSetItem(INV_KEY_META, JSON.stringify(meta.filter((c) => !c.archived).map(toRow)));
+      if (indep.length && !pending.has(INV_KEY)) nativeSetItem(INV_KEY, JSON.stringify(indep.filter((c) => !c.archived).map(toRow)));
+      if (meta.length && !pending.has(INV_KEY_META)) nativeSetItem(INV_KEY_META, JSON.stringify(meta.filter((c) => !c.archived).map(toRow)));
     }
 
-    if (perfil) {
+    if (perfil && !pending.has(PERFIL_KEY)) {
       nativeSetItem(PERFIL_KEY, JSON.stringify({
         respostas: perfil.respostas || {}, perfilKey: perfil.perfil_key,
         cats_pct: perfil.cats_pct || {}, risco: perfil.risco,
@@ -312,27 +332,96 @@
     if (archErr) throw archErr;
   }
 
+  /* ── Indicador de sincronização ── */
+  /* O usuário precisa SABER se o que digitou chegou na nuvem — falha só no
+     console é perda de dado invisível pra quem não é programador. O elemento
+     #sync-status (topbar do app.html) mostra salvando/salvo/erro; páginas
+     sem ele (não deve haver) simplesmente não mostram nada. */
+  function setStatus(estado) {
+    const el = document.getElementById("sync-status");
+    if (!el) return;
+    // Sessão expirada é o diagnóstico certo — um retry falhando depois dela
+    // não pode trocar o aviso por "sem conexão" (confundiria a causa).
+    if (el.dataset.estado === "sessao" && estado !== "sessao") return;
+    el.dataset.estado = estado;
+    const mapa = {
+      salvando: { texto: "Salvando…", cls: "" },
+      salvo: { texto: "Salvo na nuvem ✓", cls: "ok" },
+      erro: { texto: "⚠ Sem conexão — tentando de novo", cls: "erro" },
+      sessao: { texto: "⚠ Sessão expirada", cls: "erro" },
+    };
+    const m = mapa[estado];
+    el.textContent = m.texto;
+    el.className = "sync-status " + m.cls;
+    // "Salvo" some sozinho depois de um tempo; erro fica até resolver.
+    clearTimeout(el._timer);
+    if (estado === "salvo") el._timer = setTimeout(() => { el.textContent = ""; }, 3000);
+  }
+
   /* ── Fila de escrita (debounced) ── */
+  const RETRY_MS = 5000;
   async function flush() {
     flushTimer = null;
+    // Um flush por vez: dois em paralelo (edição rápida + retry/online)
+    // poderiam subir versões fora de ordem e a mais velha vencer na nuvem.
+    if (flushing) {
+      if (!flushTimer) flushTimer = setTimeout(flush, 200);
+      return;
+    }
+    flushing = true;
     const keys = [...pending];
     pending.clear();
-    for (const key of keys) {
-      try {
-        if (key === INV_KEY) await pushInvClasses(INV_KEY, "independencia");
-        else if (key === INV_KEY_META) await pushInvClasses(INV_KEY_META, "meta");
-        else if (key === PERFIL_KEY) await pushPerfil();
-        else await pushMonthKey(key);
-      } catch (err) {
-        console.error("[store] falha ao sincronizar", key, err);
-        pending.add(key); // tenta de novo na próxima
+    persistPending();
+    if (keys.length) setStatus("salvando");
+    let falhou = false;
+    try {
+      for (const key of keys) {
+        try {
+          if (key === INV_KEY) await pushInvClasses(INV_KEY, "independencia");
+          else if (key === INV_KEY_META) await pushInvClasses(INV_KEY_META, "meta");
+          else if (key === PERFIL_KEY) await pushPerfil();
+          else await pushMonthKey(key);
+        } catch (err) {
+          console.error("[store] falha ao sincronizar", key, err);
+          pending.add(key);
+          falhou = true;
+        }
       }
+    } finally {
+      flushing = false;
+      persistPending();
+    }
+    if (falhou) {
+      setStatus("erro");
+      // Antes, o retry só acontecia se o usuário editasse algo de novo — uma
+      // oscilação de rede deixava o dado órfão pra sempre naquela sessão.
+      if (!flushTimer) flushTimer = setTimeout(flush, RETRY_MS);
+    } else if (keys.length) {
+      setStatus("salvo");
     }
   }
   function queue(key) {
     pending.add(key);
+    persistPending();
     if (!flushTimer) flushTimer = setTimeout(flush, 800);
   }
+
+  // Rede voltou: sobe o que estiver pendente na hora, sem esperar o retry.
+  window.addEventListener("online", () => {
+    if (pending.size) { clearTimeout(flushTimer); flushTimer = null; flush(); }
+  });
+  // Saindo do app (troca de aba no celular, fechar janela): dispara o push
+  // imediatamente em vez de esperar o debounce de 800ms — é a última chance
+  // dos dados subirem antes do sistema congelar/matar a aba.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden" && pending.size) {
+      clearTimeout(flushTimer); flushTimer = null; flush();
+    }
+  });
+  // Fechar com pendência ainda não enviada: avisa (diálogo padrão do navegador).
+  window.addEventListener("beforeunload", (e) => {
+    if (pending.size) { e.preventDefault(); e.returnValue = ""; }
+  });
 
   // Intercepta as gravações do app e replica as chaves "fin_*" para a nuvem.
   localStorage.setItem = function (key, value) {
@@ -400,15 +489,50 @@
     nativeSetItem("fin_ledger_fantasma_fixed", "1");
   }
 
+  /* Sessão morreu com o app aberto (token vencido, senha trocada em outro
+     aparelho): sem isso, o app continua aceitando lançamentos que nunca vão
+     subir — e o pull do próximo login pode sobrescrevê-los. Um aviso claro
+     na hora, com botão pra entrar de novo, é a diferença entre "perdi meus
+     dados" e "ah, só precisei logar de novo". */
+  function mostrarAvisoSessaoExpirada() {
+    if (document.getElementById("sessao-expirada-aviso")) return;
+    setStatus("sessao");
+    const div = document.createElement("div");
+    div.id = "sessao-expirada-aviso";
+    div.className = "sessao-expirada-aviso";
+    div.innerHTML = `
+      <div class="sessao-expirada-box">
+        <h3>Sua sessão expirou</h3>
+        <p>Por segurança, você precisa entrar de novo. O que você digitou por último fica guardado neste aparelho e será enviado após o login.</p>
+        <button class="btn btn-primary" type="button">Entrar de novo</button>
+      </div>`;
+    div.querySelector("button").addEventListener("click", () => {
+      window.location.href = "auth.html";
+    });
+    document.body.appendChild(div);
+  }
+
   async function init() {
     const user = await requireSession();
     if (!user) return;
     userId = user.id;
+    db.auth.onAuthStateChange((event) => {
+      // Logout intencional (botão Sair) também dispara SIGNED_OUT — o app.js
+      // marca a flag antes pra não abrir o aviso em cima do redirecionamento.
+      if (event === "SIGNED_OUT" && !window._logoutIntencional) mostrarAvisoSessaoExpirada();
+    });
+    // Edições que ficaram sem subir na sessão anterior (aba fechada com rede
+    // caída, sessão vencida) sobem AGORA, antes do pull — é isso que torna
+    // verdadeira a promessa do aviso de sessão ("será enviado após o login").
+    // Se ainda falhar, o pull pula essas chaves e o retry continua tentando.
+    restorePending();
+    if (pending.size) await flush();
     let pulled = { monthCount: 0, classCount: 0 };
     try {
       pulled = await pull();
     } catch (err) {
       console.error("[store] erro ao baixar dados da nuvem", err);
+      setStatus("erro");
     }
     try {
       const migrated = await migrateIfNeeded(pulled);

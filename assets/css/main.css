@@ -612,6 +612,65 @@
   padding-top: 0.5rem;
 }
 
+/* ── Toast de desfazer ── */
+.undo-toast {
+  position: fixed;
+  bottom: 20px; left: 50%;
+  transform: translate(-50%, 80px);
+  background: var(--text);
+  color: var(--bg);
+  border-radius: var(--radius-lg);
+  padding: 10px 14px;
+  display: flex; align-items: center; gap: 14px;
+  font-size: 13px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  z-index: 200;
+  max-width: calc(100vw - 32px);
+}
+.undo-toast.visivel { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
+.undo-toast-msg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.undo-toast-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--bg);
+  font-family: 'Inter', sans-serif;
+  font-size: 13px; font-weight: 600;
+  text-decoration: underline;
+  padding: 4px;
+  flex-shrink: 0;
+}
+
+/* ── Campo de dinheiro inválido ── */
+.item-val.campo-invalido, .campo-invalido {
+  border-bottom-color: var(--c-red) !important;
+  color: var(--c-red);
+}
+
+/* ── Status de sincronização (topbar) ── */
+.sync-status { font-size: 11px; color: var(--text3); white-space: nowrap; }
+.sync-status.ok { color: var(--c-green); }
+.sync-status.erro { color: var(--c-red); }
+
+/* ── Aviso de sessão expirada ── */
+.sessao-expirada-aviso {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 300;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+}
+.sessao-expirada-box {
+  background: var(--bg);
+  border: 0.5px solid var(--border2);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  width: 360px; max-width: 90vw;
+}
+.sessao-expirada-box h3 { font-size: 14px; font-weight: 600; margin-bottom: 0.5rem; }
+.sessao-expirada-box p { font-size: 12px; color: var(--text2); line-height: 1.6; margin-bottom: 1.25rem; }
+
 /* ── Saúde financeira ── */
 .saude-ok {
   font-size: 12px;
