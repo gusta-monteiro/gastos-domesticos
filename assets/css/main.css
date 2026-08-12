@@ -855,6 +855,10 @@
   background: transparent;
 }
 .inv-class-extra input:focus { outline: none; border-color: var(--text3); }
+/* Preenchido, este campo SUBSTITUI o cálculo de rendimento do mês inteiro
+   pelo valor digitado — sem essa marca ele fica visualmente idêntico ao
+   campo "Taxa esperada" ao lado, que é só uma configuração de rotina. */
+.inv-saldo-real-input.tem-valor { border-color: var(--c-amber); color: var(--c-amber); font-weight: 600; }
 .inv-saldo-real-msg { font-size: 10px; color: var(--text3); }
 .inv-saldo-real-msg.ok { color: var(--c-green); }
 .inv-saldo-real-msg.erro { color: var(--c-red); }

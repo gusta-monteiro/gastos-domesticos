@@ -1393,10 +1393,13 @@ function aplicarPatrimonioReal(dados, todasClasses, classes, reserva, acumEmerg)
   if (!dados) return;
   const { porClasse, porMes } = dados;
 
-  let patrimonioTotalVal = 0, aportadoTotal = 0;
+  let patrimonioTotalVal = 0, aportadoTotal = 0, temSaldoReal = false;
   porClasse.forEach(({ evolucao }) => {
     const ultima = evolucao[evolucao.length - 1];
-    if (ultima) patrimonioTotalVal += ultima.saldoFechamento;
+    if (ultima) {
+      patrimonioTotalVal += ultima.saldoFechamento;
+      if (ultima.fonte === 'real') temSaldoReal = true;
+    }
     aportadoTotal += evolucao.reduce((s, l) => s + l.aporte, 0);
   });
   const rendimentoAcumulado = patrimonioTotalVal - aportadoTotal;
@@ -1410,9 +1413,13 @@ function aplicarPatrimonioReal(dados, todasClasses, classes, reserva, acumEmerg)
     valEl.className = 'metric-card-val ' + (rendimentoAcumulado >= 0 ? 'green' : 'red');
   }
   if (subEl) {
+    // "Projetado" é sobre a taxa esperada — enganoso quando o número vem de
+    // um "Saldo real hoje" que a própria pessoa digitou (não é estimativa,
+    // é o que ela conferiu na corretora). Distingue as duas origens.
+    const origem = temSaldoReal ? '(baseado no saldo real informado)' : 'projetado';
     subEl.textContent = rendimentoAcumulado >= 0
-      ? `${fmt(rendimentoAcumulado)} de rendimento`
-      : `${fmt(Math.abs(rendimentoAcumulado))} de perda projetada`;
+      ? `${fmt(rendimentoAcumulado)} de rendimento ${temSaldoReal ? origem : ''}`.trim()
+      : `${fmt(Math.abs(rendimentoAcumulado))} de perda ${origem}`;
   }
 
   const porClasseReal = new Map();
@@ -1451,7 +1458,7 @@ function preencherSaldosReais(porClasse, listaClasses, containerSel) {
     if (!input || input.value.trim() !== '' || document.activeElement === input) return;
     const info = porClasse.get(cls.key);
     const linha = info && info.evolucao.find(l => l.year === y && l.month === m && l.fonte === 'real');
-    if (linha) input.value = fmtCampoBR(linha.saldoFechamento);
+    if (linha) { input.value = fmtCampoBR(linha.saldoFechamento); input.classList.add('tem-valor'); }
   });
 }
 
@@ -1638,7 +1645,24 @@ function ligarSaldoReal(container, classKey, portfolio) {
   const input = container.querySelector('.inv-saldo-real-input');
   const msg = container.querySelector('.inv-saldo-real-msg');
   input.addEventListener('change', async e => {
-    if (e.target.value.trim() === '') { msg.textContent = ''; return; }
+    if (e.target.value.trim() === '') {
+      const tinhaValor = input.classList.contains('tem-valor');
+      input.classList.remove('tem-valor');
+      if (!tinhaValor) { msg.textContent = ''; return; } // nunca teve nada salvo, nada a apagar na nuvem
+      msg.textContent = 'Removendo...';
+      msg.className = 'inv-saldo-real-msg';
+      try {
+        await window.store.salvarSaldoReal(classKey, null, portfolio);
+        msg.textContent = 'Removido — voltando a projetar pela taxa esperada';
+        msg.className = 'inv-saldo-real-msg ok';
+        setTimeout(() => renderInvest(), 1200);
+      } catch (err) {
+        msg.textContent = 'Erro ao remover — tente de novo';
+        msg.className = 'inv-saldo-real-msg erro';
+        input.classList.add('tem-valor'); // não conseguiu apagar na nuvem, mantém a marca visual
+      }
+      return;
+    }
     const valor = parseValorBR(e.target.value);
     // Entrada que não vira número (ou negativa) precisa de resposta — sumir
     // em silêncio faz o usuário achar que o patrimônio foi registrado.
@@ -1648,11 +1672,12 @@ function ligarSaldoReal(container, classKey, portfolio) {
       return;
     }
     e.target.value = fmtCampoBR(valor);
+    input.classList.add('tem-valor');
     msg.textContent = 'Salvando...';
     msg.className = 'inv-saldo-real-msg';
     try {
       await window.store.salvarSaldoReal(classKey, valor, portfolio);
-      msg.textContent = 'Salvo ✓';
+      msg.textContent = 'Salvo ✓ — substituindo a projeção deste mês';
       msg.className = 'inv-saldo-real-msg ok';
       // Recalcula o Patrimônio na tela — antes, o número só mudava saindo e
       // voltando da aba, o que fazia parecer que o valor foi ignorado.
@@ -1697,7 +1722,7 @@ function renderInvClasses(todasClasses, aporte) {
       </div>
       <div class="inv-class-extra">
         <label>Taxa esperada<input class="inv-aa-input" type="text" inputmode="decimal" value="${aaPct}"> % ao ano</label>
-        <label title="Quanto está valendo hoje na corretora/banco — corrige a projeção">Saldo real hoje<input class="inv-saldo-real-input" type="text" inputmode="decimal" placeholder="Opcional"></label>
+        <label title="Opcional. Se preenchido, SUBSTITUI o cálculo deste mês inteiro pelo valor exato que você conferiu na corretora/banco — deixe vazio pra continuar projetando pela taxa esperada">Saldo real hoje<input class="inv-saldo-real-input" type="text" inputmode="decimal" placeholder="Opcional"></label>
         <span class="inv-saldo-real-msg" role="status" aria-live="polite"></span>
       </div>
     `;
@@ -1798,7 +1823,7 @@ function renderInvClassesMeta(classesMeta, aporte) {
       </div>
       <div class="inv-class-extra">
         <label>Taxa esperada<input class="inv-aa-input" type="text" inputmode="decimal" value="${aaPct}"> % ao ano</label>
-        <label title="Quanto está valendo hoje na corretora/banco — corrige a projeção">Saldo real hoje<input class="inv-saldo-real-input" type="text" inputmode="decimal" placeholder="Opcional"></label>
+        <label title="Opcional. Se preenchido, SUBSTITUI o cálculo deste mês inteiro pelo valor exato que você conferiu na corretora/banco — deixe vazio pra continuar projetando pela taxa esperada">Saldo real hoje<input class="inv-saldo-real-input" type="text" inputmode="decimal" placeholder="Opcional"></label>
         <span class="inv-saldo-real-msg" role="status" aria-live="polite"></span>
       </div>
     `;
@@ -1884,7 +1909,7 @@ function renderReserva(todasClasses, aporteMes, acumEmerg, saldoReal) {
     </div>
     <div class="inv-class-extra">
       <label>Taxa esperada<input class="inv-aa-input" type="text" inputmode="decimal" value="${aaPct}"> % ao ano</label>
-      <label title="Quanto está valendo hoje na corretora/banco — corrige a projeção">Saldo real hoje<input class="inv-saldo-real-input" type="text" inputmode="decimal" placeholder="Opcional"></label>
+      <label title="Opcional. Se preenchido, SUBSTITUI o cálculo deste mês inteiro pelo valor exato que você conferiu na corretora/banco — deixe vazio pra continuar projetando pela taxa esperada">Saldo real hoje<input class="inv-saldo-real-input" type="text" inputmode="decimal" placeholder="Opcional"></label>
       <span class="inv-saldo-real-msg" role="status" aria-live="polite"></span>
     </div>
   `;

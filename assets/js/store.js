@@ -232,6 +232,20 @@
     const { error: ledgerErr } = await db.from("invest_ledger")
       .upsert(linhas, { onConflict: "user_id,class_id,year,month" });
     if (ledgerErr) throw ledgerErr;
+
+    // Zera sobra de classe que recebia este mês antes e não recebe mais —
+    // sem isso, reconfigurar as classes (apagar as antigas, criar novas)
+    // faz o MESMO valor lançado ficar contado duas vezes: uma vez "preso"
+    // na classe antiga (arquivada, mas o ledger dela nunca é tocado de
+    // novo) e outra vez na classe nova que herdou o rateio. Só mexe neste
+    // (year, month) — nunca em meses que este push não está recalculando.
+    const idsAtivos = linhas.map((l) => l.class_id);
+    const { error: zeraErr } = await db.from("invest_ledger")
+      .update({ aporte: 0, updated_at: agora })
+      .eq("user_id", userId).eq("year", year).eq("month", month)
+      .not("class_id", "in", `(${idsAtivos.map((id) => JSON.stringify(id)).join(",")})`)
+      .neq("aporte", 0);
+    if (zeraErr) throw zeraErr;
   }
 
   /* Marcação a mercado manual: grava o saldo real de uma classe no mês que
