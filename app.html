@@ -22,15 +22,15 @@
       <p>Gestão doméstica</p>
     </div>
     <nav class="sidebar-nav">
-      <div class="nav-item active" data-page="calc"><i class="ti ti-calculator"></i> Calculadora</div>
-      <div class="nav-item" data-page="period"><i class="ti ti-chart-line"></i> Por período</div>
-      <div class="nav-item" data-page="report"><i class="ti ti-file-text"></i> Relatório</div>
-      <div class="nav-item" data-page="invest"><i class="ti ti-trending-up"></i> Investimentos</div>
+      <div class="nav-item active" data-page="calc" role="button" tabindex="0"><i aria-hidden="true" class="ti ti-calculator"></i> Calculadora</div>
+      <div class="nav-item" data-page="period" role="button" tabindex="0"><i aria-hidden="true" class="ti ti-chart-line"></i> Por período</div>
+      <div class="nav-item" data-page="report" role="button" tabindex="0"><i aria-hidden="true" class="ti ti-file-text"></i> Relatório</div>
+      <div class="nav-item" data-page="invest" role="button" tabindex="0"><i aria-hidden="true" class="ti ti-trending-up"></i> Investimentos</div>
     </nav>
     <div class="sidebar-footer">
-      <div class="nav-item" data-page="profile"><i class="ti ti-user-circle"></i> <span id="sidebar-username">Perfil</span></div>
+      <div class="nav-item" data-page="profile" role="button" tabindex="0"><i aria-hidden="true" class="ti ti-user-circle"></i> <span id="sidebar-username">Perfil</span></div>
       <button class="theme-toggle sidebar-theme-toggle" type="button" aria-label="Mudar tema">
-        <i class="ti ti-moon"></i> <span>Tema</span>
+        <i aria-hidden="true" class="ti ti-moon"></i> <span>Tema</span>
       </button>
     </div>
   </aside>
@@ -40,12 +40,12 @@
     <!-- Topbar -->
     <div class="topbar">
       <div class="topbar-left">
-        <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Abrir menu"><i class="ti ti-menu-2"></i></button>
+        <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Abrir menu"><i aria-hidden="true" class="ti ti-menu-2"></i></button>
         <span class="page-title" id="page-title">Calculadora</span>
         <div class="month-nav" id="month-nav">
-          <button id="prev-month" aria-label="Mês anterior"><i class="ti ti-chevron-left"></i></button>
+          <button id="prev-month" aria-label="Mês anterior"><i aria-hidden="true" class="ti ti-chevron-left"></i></button>
           <span class="month-label" id="month-label"></span>
-          <button id="next-month" aria-label="Próximo mês"><i class="ti ti-chevron-right"></i></button>
+          <button id="next-month" aria-label="Próximo mês"><i aria-hidden="true" class="ti ti-chevron-right"></i></button>
           <button id="btn-hoje" class="btn-hoje" style="display:none" title="Voltar para o mês atual">hoje</button>
         </div>
       </div>
@@ -55,7 +55,7 @@
           <label>Renda do mês</label>
           <span class="renda-total" id="renda-total">R$ 0,00</span>
         </div>
-        <button class="theme-toggle" type="button" aria-label="Mudar tema"><i class="ti ti-moon"></i></button>
+        <button class="theme-toggle" type="button" aria-label="Mudar tema"><i aria-hidden="true" class="ti ti-moon"></i></button>
       </div>
     </div>
 
@@ -102,7 +102,7 @@
     <div class="page" id="page-period">
       <div id="aviso-mes-period"></div>
       <div class="period-controls">
-        <label>Período</label>
+        <label for="period-select">Período</label>
         <select id="period-select">
           <option value="3">Últimos 3 meses</option>
           <option value="6" selected>Últimos 6 meses</option>
@@ -130,19 +130,19 @@
     <div class="page" id="page-report">
       <div id="aviso-mes-report"></div>
       <div class="report-controls">
-        <label style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Período</label>
+        <label for="report-period" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">Período</label>
         <select id="report-period">
           <option value="3">Últimos 3 meses</option>
           <option value="6" selected>Últimos 6 meses</option>
           <option value="12">Últimos 12 meses</option>
         </select>
-        <button class="btn" onclick="window.print()"><i class="ti ti-printer"></i> Imprimir</button>
+        <button class="btn" onclick="window.print()"><i aria-hidden="true" class="ti ti-printer"></i> Imprimir</button>
       </div>
 
       <div class="report-card" id="report-content"></div>
 
       <div class="report-card">
-        <div class="ai-label"><i class="ti ti-chart-dots"></i> Parecer do período</div>
+        <div class="ai-label"><i aria-hidden="true" class="ti ti-chart-dots"></i> Parecer do período</div>
         <div class="ai-box" id="ai-output">Selecione um período para visualizar o parecer.</div>
       </div>
     </div>
@@ -265,7 +265,7 @@
           <div class="profile-avatar-wrap">
             <div class="profile-avatar" id="profile-avatar-display">G</div>
             <div class="profile-avatar-overlay" id="profile-avatar-btn" title="Alterar foto">
-              <i class="ti ti-camera"></i>
+              <i aria-hidden="true" class="ti ti-camera"></i>
             </div>
             <input type="file" id="profile-avatar-input" accept="image/*" style="display:none">
           </div>
@@ -281,13 +281,13 @@
           <div class="card">
             <div class="card-header"><span>Dados pessoais</span></div>
             <div class="profile-form">
-              <div id="profile-msg" class="profile-msg" style="display:none"></div>
+              <div id="profile-msg" class="profile-msg" style="display:none" role="status" aria-live="polite"></div>
               <div class="profile-field">
-                <label>Nome completo</label>
+                <label for="profile-name">Nome completo</label>
                 <input type="text" id="profile-name" placeholder="Seu nome">
               </div>
               <div class="profile-field">
-                <label>E-mail</label>
+                <label for="profile-email">E-mail</label>
                 <input type="email" id="profile-email" placeholder="seu@email.com">
               </div>
               <button class="btn btn-primary" id="btn-save-profile">Salvar alterações</button>
@@ -371,7 +371,7 @@
                 </div>
               </div>
 
-              <div id="perfil-msg" class="profile-msg" style="display:none"></div>
+              <div id="perfil-msg" class="profile-msg" style="display:none" role="status" aria-live="polite"></div>
               <button class="btn btn-primary" id="btn-calcular-perfil">Calcular meu perfil</button>
               <div id="perfil-resultado"></div>
             </div>
@@ -381,14 +381,14 @@
           <div class="card">
             <div class="card-header"><span>Alterar senha</span></div>
             <div class="profile-form">
-              <div id="password-msg" class="profile-msg" style="display:none"></div>
+              <div id="password-msg" class="profile-msg" style="display:none" role="status" aria-live="polite"></div>
               <div class="profile-field">
-                <label>Nova senha</label>
-                <input type="password" id="profile-new-password" placeholder="Mínimo 6 caracteres">
+                <label for="profile-new-password">Nova senha</label>
+                <input type="password" id="profile-new-password" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
               </div>
               <div class="profile-field">
-                <label>Confirmar nova senha</label>
-                <input type="password" id="profile-confirm-password" placeholder="Repita a senha">
+                <label for="profile-confirm-password">Confirmar nova senha</label>
+                <input type="password" id="profile-confirm-password" placeholder="Repita a senha" autocomplete="new-password">
               </div>
               <button class="btn btn-primary" id="btn-save-password">Alterar senha</button>
             </div>
@@ -399,7 +399,7 @@
             <div class="card-header"><span>Sessão</span></div>
             <div class="profile-form">
               <p style="font-size:12px;color:var(--text2);margin-bottom:1rem">Ao sair, você precisará fazer login novamente para acessar suas informações.</p>
-              <button class="btn btn-logout" id="btn-logout"><i class="ti ti-logout"></i> Sair da conta</button>
+              <button class="btn btn-logout" id="btn-logout"><i aria-hidden="true" class="ti ti-logout"></i> Sair da conta</button>
             </div>
           </div>
 
@@ -411,13 +411,13 @@
 </div>
 
 <!-- Modal confirmação logout -->
-<div class="confirm-overlay" id="confirm-overlay">
+<div class="confirm-overlay" id="confirm-overlay" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
   <div class="confirm-box">
-    <h3>Sair da conta</h3>
+    <h3 id="confirm-title">Sair da conta</h3>
     <p>Tem certeza que deseja sair? Você precisará fazer login novamente para acessar suas informações.</p>
     <div class="confirm-btns">
       <button class="btn" id="confirm-cancel">Cancelar</button>
-      <button class="btn btn-logout" id="confirm-logout"><i class="ti ti-logout"></i> Sair</button>
+      <button class="btn btn-logout" id="confirm-logout"><i aria-hidden="true" class="ti ti-logout"></i> Sair</button>
     </div>
   </div>
 </div>

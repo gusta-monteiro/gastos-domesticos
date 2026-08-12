@@ -6,7 +6,7 @@
   --bg3: #f0f0ee;
   --text: #1a1a18;
   --text2: #5f5e5a;
-  --text3: #999891;
+  --text3: #7d7c75;
   --border: rgba(0,0,0,0.10);
   --border2: rgba(0,0,0,0.18);
   --radius: 8px;
@@ -258,4 +258,25 @@ footer p { font-size: 11px; color: var(--text3); }
 /* iPhone dá zoom automático ao focar campo com fonte < 16px */
 @media (max-width: 700px) {
   .field input { font-size: 16px; }
+}
+
+/* ── Acessibilidade ── */
+/* Foco visível pra navegação por teclado — os inputs sinalizam foco só com
+   a borda de 0,5px, imperceptível; isto dá um anel claro a botões, links,
+   itens de navegação e cabeçalhos de categoria quando focados via teclado
+   (o :focus-visible não dispara em clique/toque, então o visual de mouse
+   continua limpo). */
+:focus-visible {
+  outline: 2px solid var(--text2);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Quem pediu menos movimento no sistema recebe menos movimento. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

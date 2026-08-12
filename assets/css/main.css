@@ -6,7 +6,7 @@
     --bg3: #f0f0ee;
     --text: #1a1a18;
     --text2: #5f5e5a;
-    --text3: #999891;
+    --text3: #7d7c75;
     --border: rgba(0,0,0,0.10);
     --border2: rgba(0,0,0,0.18);
     --radius: 8px;
@@ -189,7 +189,7 @@
     border-radius: var(--radius-lg); padding: 1rem 1.1rem;
   }
   .metric-card-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text3); margin-bottom: 6px; }
-  .metric-card-val { font-size: 20px; font-weight: 500; color: var(--text); }
+  .metric-card-val { font-size: 20px; font-weight: 500; color: var(--text); overflow-wrap: anywhere; }
   .metric-card-sub { font-size: 11px; color: var(--text3); margin-top: 3px; }
   .green { color: var(--c-green) !important; }
   .red { color: var(--c-red) !important; }
@@ -321,7 +321,7 @@
     font-family: 'Inter', sans-serif; color: var(--text); background: var(--bg);
     cursor: pointer;
   }
-  .period-controls select:focus { outline: none; }
+  .period-controls select:focus-visible { outline: 2px solid var(--text2); outline-offset: 2px; }
   .period-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
   .period-chart-wrap { position: relative; height: 260px; }
 
@@ -916,3 +916,24 @@
   transition: background 0.15s;
 }
 .rec-add:hover { background: var(--bg2); color: var(--text); }
+
+/* ── Acessibilidade ── */
+/* Foco visível pra navegação por teclado — os inputs sinalizam foco só com
+   a borda de 0,5px, imperceptível; isto dá um anel claro a botões, links,
+   itens de navegação e cabeçalhos de categoria quando focados via teclado
+   (o :focus-visible não dispara em clique/toque, então o visual de mouse
+   continua limpo). */
+:focus-visible {
+  outline: 2px solid var(--text2);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Quem pediu menos movimento no sistema recebe menos movimento. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -19,7 +19,7 @@
     <nav>
       <a href="index.html" class="nav-logo">Finanças <span>Pessoais</span></a>
       <div style="display: flex; align-items: center; gap: 10px">
-        <button class="theme-toggle" type="button" aria-label="Mudar tema"><i class="ti ti-moon"></i></button>
+        <button class="theme-toggle" type="button" aria-label="Mudar tema"><i aria-hidden="true" class="ti ti-moon"></i></button>
         <a href="index.html" class="nav-back">← Voltar ao início</a>
       </div>
     </nav>
@@ -27,8 +27,8 @@
     <div class="auth-wrap">
       <div class="auth-box">
         <div class="auth-tabs">
-          <div class="auth-tab active" data-tab="login">Entrar</div>
-          <div class="auth-tab" data-tab="signup">Cadastrar-se</div>
+          <div class="auth-tab active" data-tab="login" role="button" tabindex="0">Entrar</div>
+          <div class="auth-tab" data-tab="signup" role="button" tabindex="0">Cadastrar-se</div>
         </div>
 
         <!-- Login -->

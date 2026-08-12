@@ -101,6 +101,8 @@ document.getElementById("btn-reset").addEventListener("click", async () => {
 
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Enter") return;
+  // Só quando o foco está num campo do formulário (ver auth.js).
+  if (!e.target.matches("#form-reset input")) return;
   if (document.getElementById("form-reset").classList.contains("active")) {
     document.getElementById("btn-reset").click();
   }

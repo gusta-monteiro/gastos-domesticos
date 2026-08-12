@@ -18,6 +18,12 @@ let curYear  = new Date().getFullYear();
 let pieChart = null, barChart = null, stackChart = null;
 let pieRenda = 0; // renda do último render — o tooltip do gráfico lê daqui
 
+// Quem pediu "reduzir movimento" no sistema não deve ver a pizza re-animando
+// a cada tecla digitada num valor.
+if (typeof Chart !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  Chart.defaults.animation = false;
+}
+
 /* ── Tema (modo escuro) ── */
 function estaEscuro() { return typeof window.temaEscuro === 'function' && window.temaEscuro(); }
 // Segmentos de pizza/doughnut ficam escuros demais pra distinguir do fundo
@@ -307,6 +313,11 @@ document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
 document.getElementById('sidebar-backdrop')?.addEventListener('click', fecharMenuMobile);
 
 document.querySelectorAll('.nav-item').forEach(el => {
+  // Enter/Espaço ativam como um botão de verdade — sem isso, quem navega
+  // por teclado ficava preso pra sempre na Calculadora.
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
+  });
   el.addEventListener('click', () => {
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -438,9 +449,9 @@ function renderRendas(md) {
       <div class="item-row">
         <input class="item-name" type="text" placeholder="Ex.: Salário" value="${esc(r.name)}" data-i="${i}">
         <input class="item-val" type="text" inputmode="decimal" placeholder="0,00" value="${esc(fmtCampoBR(r.value))}" data-i="${i}">
-        <button class="del-btn" data-i="${i}"><i class="ti ti-x"></i></button>
+        <button class="del-btn" data-i="${i}" aria-label="Apagar renda"><i aria-hidden="true" class="ti ti-x"></i></button>
       </div>`).join('')}
-    <button class="add-item-btn" id="add-renda-btn"><i class="ti ti-plus"></i> Adicionar renda</button>
+    <button class="add-item-btn" id="add-renda-btn"><i aria-hidden="true" class="ti ti-plus"></i> Adicionar renda</button>
   </div>`;
 
   const persistir = () => {
@@ -547,7 +558,7 @@ function renderCategories(md, renda) {
     const div = document.createElement('div');
     div.className = 'category';
     div.innerHTML = `
-      <div class="cat-header">
+      <div class="cat-header" role="button" tabindex="0" aria-expanded="${isOpen}">
         <span class="cat-dot" style="background:${corTema(def.color)}"></span>
         <span class="cat-name">${def.label}</span>
         <div class="cat-pct-wrap">
@@ -570,8 +581,8 @@ function renderCategories(md, renda) {
               <input class="item-name" type="text" placeholder="Descrição" value="${esc(it.name)}" data-ci="${ci}" data-ii="${ii}">
               ${temParcela ? `<span class="item-parcela-badge">${pAtual}/${pTotal}</span>` : ''}
               <input class="item-val" type="text" inputmode="decimal" placeholder="0,00" value="${esc(fmtCampoBR(it.value))}" data-ci="${ci}" data-ii="${ii}">
-              ${CATS_COM_PARCELA.has(def.key) ? `<button class="item-parcela-toggle ${temParcela ? 'active' : ''}" data-ci="${ci}" data-ii="${ii}" title="É parcelado?"><i class="ti ti-calendar"></i></button>` : ''}
-              <button class="del-btn" data-ci="${ci}" data-ii="${ii}"><i class="ti ti-x"></i></button>
+              ${CATS_COM_PARCELA.has(def.key) ? `<button class="item-parcela-toggle ${temParcela ? 'active' : ''}" data-ci="${ci}" data-ii="${ii}" title="É parcelado?" aria-label="Marcar como parcelado"><i aria-hidden="true" class="ti ti-calendar"></i></button>` : ''}
+              <button class="del-btn" data-ci="${ci}" data-ii="${ii}" aria-label="Apagar item"><i aria-hidden="true" class="ti ti-x"></i></button>
             </div>
             ${temParcela ? `
               <div class="item-parcela-row">
@@ -583,7 +594,7 @@ function renderCategories(md, renda) {
             ` : ''}
           </div>
         `;}).join('')}
-        <button class="add-item-btn" data-ci="${ci}"><i class="ti ti-plus"></i> Adicionar item</button>
+        <button class="add-item-btn" data-ci="${ci}"><i aria-hidden="true" class="ti ti-plus"></i> Adicionar item</button>
         ${lancado > 0 ? `<div class="cat-summary">Lançado: ${fmt(lancado)} / ${fmt(alocado)} (${pct(lancado,alocado)}%)</div>` : ''}
       </div>
     `;
@@ -597,7 +608,14 @@ function renderCategories(md, renda) {
       const was = itemsDiv.classList.contains('open');
       itemsDiv.classList.toggle('open');
       toggle.classList.toggle('open');
+      header.setAttribute('aria-expanded', String(!was));
       sessionStorage.setItem('cat_' + def.key, was ? '0' : '1');
+    });
+    header.addEventListener('keydown', e => {
+      if ((e.key === 'Enter' || e.key === ' ') && e.target === header) {
+        e.preventDefault();
+        header.click();
+      }
     });
 
     // Atualização parcial de propósito: chamar renderCalc() aqui destruía o
@@ -796,8 +814,8 @@ function renderRecorrentes() {
   panel.innerHTML = `
     <div class="rec-card">
       <div class="rec-head">
-        <span class="rec-title"><i class="ti ti-repeat"></i> Recorrentes de meses anteriores</span>
-        <button class="btn" id="rec-add-all"><i class="ti ti-plus"></i> Adicionar todos</button>
+        <span class="rec-title"><i aria-hidden="true" class="ti ti-repeat"></i> Recorrentes de meses anteriores</span>
+        <button class="btn" id="rec-add-all"><i aria-hidden="true" class="ti ti-plus"></i> Adicionar todos</button>
       </div>
       ${sugs.map((s, i) => `
         <div class="rec-row">
@@ -806,8 +824,8 @@ function renderRecorrentes() {
           <span class="rec-tag">${s.tipo ? esc(s.tipo) : `repetiu ${s.meses}×`}</span>
           <span class="rec-cat">${esc(catDe(s.catKey).label)}</span>
           <span class="rec-val">${fmt(s.value)}</span>
-          <button class="rec-add" data-i="${i}" title="Adicionar ao mês"><i class="ti ti-plus"></i></button>
-          <button class="rec-dismiss" data-i="${i}" title="Não vou ter mais esse gasto"><i class="ti ti-x"></i></button>
+          <button class="rec-add" data-i="${i}" title="Adicionar ao mês" aria-label="Adicionar ao mês"><i aria-hidden="true" class="ti ti-plus"></i></button>
+          <button class="rec-dismiss" data-i="${i}" title="Não vou ter mais esse gasto" aria-label="Dispensar sugestão"><i aria-hidden="true" class="ti ti-x"></i></button>
         </div>`).join('')}
     </div>`;
 
@@ -1509,12 +1527,12 @@ function renderInvClasses(todasClasses, aporte) {
           <span class="cat-pct-sym">%</span>
         </div>
         <span class="cat-value">${fmt(val)}</span>
-        <button class="del-btn" title="Remover"><i class="ti ti-x"></i></button>
+        <button class="del-btn" title="Remover" aria-label="Remover classe"><i aria-hidden="true" class="ti ti-x"></i></button>
       </div>
       <div class="inv-class-extra">
         <label>Taxa esperada<input class="inv-aa-input" type="text" inputmode="decimal" value="${aaPct}"> % ao ano</label>
         <label title="Quanto está valendo hoje na corretora/banco — corrige a projeção">Saldo real hoje<input class="inv-saldo-real-input" type="text" inputmode="decimal" placeholder="Opcional"></label>
-        <span class="inv-saldo-real-msg"></span>
+        <span class="inv-saldo-real-msg" role="status" aria-live="polite"></span>
       </div>
     `;
     div.querySelector('.item-name').addEventListener('input', e => {
@@ -1568,7 +1586,7 @@ function renderInvClasses(todasClasses, aporte) {
 
   const addWrap = document.createElement('div');
   addWrap.style.cssText = 'padding:0.6rem 1.25rem;border-top:0.5px solid var(--border)';
-  addWrap.innerHTML = `<button class="add-item-btn" id="inv-add-class"><i class="ti ti-plus"></i> Adicionar classe</button>`;
+  addWrap.innerHTML = `<button class="add-item-btn" id="inv-add-class"><i aria-hidden="true" class="ti ti-plus"></i> Adicionar classe</button>`;
   container.appendChild(addWrap);
   document.getElementById('inv-add-class').addEventListener('click', () => {
     const palette = ['#2C2C2A','#5f5e5a','#888780','#b4b2a9','#d3d1c7','#444441'];
@@ -1610,12 +1628,12 @@ function renderInvClassesMeta(classesMeta, aporte) {
           <span class="cat-pct-sym">%</span>
         </div>
         <span class="cat-value">${fmt(val)}</span>
-        <button class="del-btn" title="Remover"><i class="ti ti-x"></i></button>
+        <button class="del-btn" title="Remover" aria-label="Remover classe"><i aria-hidden="true" class="ti ti-x"></i></button>
       </div>
       <div class="inv-class-extra">
         <label>Taxa esperada<input class="inv-aa-input" type="text" inputmode="decimal" value="${aaPct}"> % ao ano</label>
         <label title="Quanto está valendo hoje na corretora/banco — corrige a projeção">Saldo real hoje<input class="inv-saldo-real-input" type="text" inputmode="decimal" placeholder="Opcional"></label>
-        <span class="inv-saldo-real-msg"></span>
+        <span class="inv-saldo-real-msg" role="status" aria-live="polite"></span>
       </div>
     `;
     div.querySelector('.item-name').addEventListener('input', e => {
@@ -1665,7 +1683,7 @@ function renderInvClassesMeta(classesMeta, aporte) {
 
   const addWrap = document.createElement('div');
   addWrap.style.cssText = 'padding:0.6rem 1.25rem;border-top:0.5px solid var(--border)';
-  addWrap.innerHTML = `<button class="add-item-btn" id="inv-add-class-meta"><i class="ti ti-plus"></i> Adicionar classe</button>`;
+  addWrap.innerHTML = `<button class="add-item-btn" id="inv-add-class-meta"><i aria-hidden="true" class="ti ti-plus"></i> Adicionar classe</button>`;
   container.appendChild(addWrap);
   document.getElementById('inv-add-class-meta').addEventListener('click', () => {
     const palette = ['#2C2C2A','#5f5e5a','#888780','#b4b2a9','#d3d1c7','#444441'];
@@ -1701,7 +1719,7 @@ function renderReserva(todasClasses, aporteMes, acumEmerg, saldoReal) {
     <div class="inv-class-extra">
       <label>Taxa esperada<input class="inv-aa-input" type="text" inputmode="decimal" value="${aaPct}"> % ao ano</label>
       <label title="Quanto está valendo hoje na corretora/banco — corrige a projeção">Saldo real hoje<input class="inv-saldo-real-input" type="text" inputmode="decimal" placeholder="Opcional"></label>
-      <span class="inv-saldo-real-msg"></span>
+      <span class="inv-saldo-real-msg" role="status" aria-live="polite"></span>
     </div>
   `;
   container.querySelector('.inv-aa-input').addEventListener('change', e => {
@@ -2229,9 +2247,24 @@ document.getElementById('btn-calcular-perfil').addEventListener('click', () => {
 // Logout com confirmação
 document.getElementById('btn-logout').addEventListener('click', () => {
   document.getElementById('confirm-overlay').classList.add('open');
+  // Foco entra no diálogo (no botão seguro) — sem isso, Tab continuava
+  // passeando pelo conteúdo atrás do overlay.
+  document.getElementById('confirm-cancel').focus();
 });
 document.getElementById('confirm-cancel').addEventListener('click', () => {
   document.getElementById('confirm-overlay').classList.remove('open');
+  document.getElementById('btn-logout').focus(); // devolve o foco à origem
+});
+// Tocar fora do cartão e Esc fecham — os dois gestos que todo mundo tenta.
+document.getElementById('confirm-overlay').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) document.getElementById('confirm-cancel').click();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const overlay = document.getElementById('confirm-overlay');
+  if (overlay.classList.contains('open')) { document.getElementById('confirm-cancel').click(); return; }
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar?.classList.contains('open')) fecharMenuMobile();
 });
 document.getElementById('confirm-logout').addEventListener('click', async () => {
   window._logoutIntencional = true; // ver aviso de sessão expirada no store.js

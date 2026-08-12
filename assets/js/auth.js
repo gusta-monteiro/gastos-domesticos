@@ -8,7 +8,14 @@ function setTab(tab) {
   document.querySelector(".auth-box").classList.toggle("recovery", tab === "forgot");
 }
 
-tabs.forEach((t) => t.addEventListener("click", () => setTab(t.dataset.tab)));
+tabs.forEach((t) => {
+  t.addEventListener("click", () => setTab(t.dataset.tab));
+  // As abas são divs — Enter/Espaço precisam ativar como botão pra quem
+  // navega por teclado conseguir alternar entre Entrar e Cadastrar-se.
+  t.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setTab(t.dataset.tab); }
+  });
+});
 
 if (window.location.hash === "#signup") setTab("signup");
 if (window.location.hash === "#recuperar") setTab("forgot");
@@ -158,6 +165,9 @@ document.getElementById("btn-forgot").addEventListener("click", async () => {
 /* ── Enter para submeter ── */
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Enter") return;
+  // Só quando o foco está num CAMPO do formulário — Enter no botão de tema
+  // ou num link disparava o login junto ("Preencha e-mail e senha" do nada).
+  if (!e.target.matches(".auth-form.active input")) return;
   const activeForm = document.querySelector(".auth-form.active").id;
   if (activeForm === "form-login") document.getElementById("btn-login").click();
   if (activeForm === "form-signup")
