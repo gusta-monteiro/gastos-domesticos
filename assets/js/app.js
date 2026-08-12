@@ -766,7 +766,7 @@ function renderReport() {
 
   /* Resumo por mês */
   html += `<div class="report-section-title">Resumo mensal</div>`;
-  html += `<table class="report-table">
+  html += `<div class="table-scroll"><table class="report-table">
     <thead><tr>
       <th>Mês</th>
       <th class="num">Renda</th>
@@ -787,11 +787,11 @@ function renderReport() {
       <td class="num">${taxa}%</td>
     </tr>`;
   });
-  html += `</tbody></table>`;
+  html += `</tbody></table></div>`;
 
   /* Detalhamento por categoria */
   html += `<br><div class="report-section-title">Gastos por categoria</div>`;
-  html += `<table class="report-table"><thead><tr><th>Categoria</th>${data.map(d => `<th class="num">${d.label}</th>`).join('')}</tr></thead><tbody>`;
+  html += `<div class="table-scroll"><table class="report-table"><thead><tr><th>Categoria</th>${data.map(d => `<th class="num">${d.label}</th>`).join('')}</tr></thead><tbody>`;
   CATS.forEach((def, ci) => {
     html += `<tr><td>${def.label}</td>`;
     data.forEach(({md}) => {
@@ -800,7 +800,7 @@ function renderReport() {
     });
     html += `</tr>`;
   });
-  html += `</tbody></table>`;
+  html += `</tbody></table></div>`;
 
   document.getElementById('report-content').innerHTML = html;
   gerarParecer(months);

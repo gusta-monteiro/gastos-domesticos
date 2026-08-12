@@ -400,9 +400,21 @@
     body { background: white; }
   }
 
+  /* Grid da página Investimentos (era style inline — inline não pode ser
+     sobrescrito por media query, então a página nunca colapsava no celular
+     e ficava espremida/com rolagem lateral). */
+  .invest-grid { display: grid; grid-template-columns: 1fr 300px; gap: 1.5rem; }
+
+  /* Tabelas largas (Histórico de aportes, Relatório com até 13 colunas)
+     rolam DENTRO do próprio card — sem isso, no celular elas estouram o
+     cartão e forçam a página inteira a rolar de lado. */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .table-scroll .report-table { min-width: max-content; }
+
   @media (max-width: 900px) {
     .calc-grid { grid-template-columns: 1fr; }
     .period-grid { grid-template-columns: 1fr; }
+    .invest-grid { grid-template-columns: 1fr; }
   }
   @media (max-width: 700px) {
     /* A barra lateral vira uma gaveta: some da tela por padrão (deslizada
@@ -427,6 +439,30 @@
     .mobile-menu-btn { display: flex; }
     .content { margin-left: 0; }
     .topbar { padding: 0.75rem 1rem; flex-wrap: wrap; }
+
+    /* Espaço útil: 2rem de padding comia 64px dos ~375px da tela e
+       espremia a linha da categoria (nome + % + valores + chevron). */
+    .page { padding: 1rem; }
+
+    /* iPhone dá zoom automático ao focar campo com fonte < 16px — em um
+       app que é uma lista de campos, isso fazia a tela "pular" a cada
+       toque. 16px nos campos só no celular; o desktop mantém o visual. */
+    .item-name, .item-val, .cat-pct-input, .renda-wrap input,
+    .inv-class-extra input, .profile-field input, .modal input,
+    .item-parcela-row input, .period-controls select { font-size: 16px; }
+
+    /* Alvos de toque: o mínimo confortável é ~40px; os controles mais
+       usados estavam entre 14 e 30px e geravam toques errados — inclusive
+       o X de apagar colado no campo de valor. */
+    .month-nav button { width: 38px; height: 38px; }
+    .theme-toggle, .mobile-menu-btn { width: 38px; height: 38px; }
+    .del-btn, .item-parcela-toggle {
+      min-width: 36px; min-height: 36px;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .cat-pct-input { min-height: 36px; }
+    .rec-add { width: 34px; height: 34px; }
+    .add-item-btn { padding: 8px 0; }
   }
 
 /* ── Sidebar footer ── */
