@@ -13,6 +13,56 @@ const CATS = [
 const CATS_COM_PARCELA = new Set(['fixos', 'variaveis']);
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
+/* Ajuda sob demanda (ícone "?" da topbar) — uma entrada por data-page do
+   menu lateral, linguagem simples, sem jargão. */
+const AJUDA_TEXTOS = {
+  calc: {
+    titulo: 'Calculadora',
+    itens: [
+      'Lance sua renda do mês no cartão "Rendas do mês" — pode ser mais de uma (salário, freelance, etc.), o app soma tudo.',
+      'Cada categoria tem uma % da renda como meta (ex.: Custos Fixos 55%). Dentro dela, lance cada gasto como um item — nome e valor.',
+      'A barra de cada categoria mostra o quanto já foi lançado comparado à meta. Passar da meta não trava nada, é só um alerta visual.',
+      'Use as setas ao lado do mês pra ver ou editar meses passados. O botão "hoje" volta pro mês atual.',
+      'Custos Fixos e Custos Variáveis aceitam marcar um item como parcelado (ex.: 3/10) — o app acompanha sozinho até quitar.',
+    ],
+  },
+  period: {
+    titulo: 'Por período',
+    itens: [
+      'Mostra a evolução de vários meses juntos — escolha 3, 6 ou 12 meses no seletor.',
+      'O primeiro gráfico compara renda e gastos mês a mês. O segundo mostra como os gastos se dividem entre as categorias ao longo do tempo.',
+      'Os cartões no topo resumem o total do período: renda, gasto, saldo e a taxa de gasto sobre a renda.',
+    ],
+  },
+  report: {
+    titulo: 'Relatório',
+    itens: [
+      'Um resumo mês a mês do período escolhido, com tabelas de renda/gasto/saldo e o detalhamento por categoria.',
+      'Os gráficos abaixo das tabelas mostram a mesma informação de forma visual: evolução do saldo, patrimônio investido, categorias e parcelamentos em aberto.',
+      'O "Parecer do período" é gerado automaticamente a partir dos seus números — aponta o que está dentro da meta e o que merece atenção.',
+      'O botão "Imprimir" gera uma versão limpa, sem os menus, pronta pra salvar em PDF pelo navegador.',
+    ],
+  },
+  invest: {
+    titulo: 'Investimentos',
+    itens: [
+      'O que você lança nas categorias Independência Financeira, Reserva de Emergência e Meta na Calculadora aparece aqui, dividido entre as classes que você configurar (Renda Fixa, Ações, etc.).',
+      '"Taxa esperada" é a previsão de rendimento anual de cada classe — usada pra projetar o crescimento mês a mês.',
+      '"Saldo real hoje" é opcional: se você preencher, o app substitui a projeção daquele mês pelo valor exato que você conferiu na corretora/banco. Deixe vazio pra continuar projetando pela taxa esperada.',
+      'A carteira "Meta de Curto/Médio Prazo" é separada da Independência — dinheiro com um objetivo de prazo mais curto não precisa correr o mesmo risco de longo prazo.',
+    ],
+  },
+  profile: {
+    titulo: 'Perfil',
+    itens: [
+      'O questionário sugere como dividir sua renda entre as categorias, baseado nas suas respostas — não é obrigatório seguir à risca, é um ponto de partida.',
+      'Depois de calculado, o botão "Aplicar perfil" atualiza as % das categorias a partir de hoje (meses passados não são alterados).',
+      'O cartão "Saúde Financeira" resume suas dívidas parceladas em aberto.',
+      'Aqui também dá pra trocar sua senha e sair da conta.',
+    ],
+  },
+};
+
 let curMonth = new Date().getMonth();
 let curYear  = new Date().getFullYear();
 let pieChart = null, barChart = null, stackChart = null;
@@ -425,6 +475,40 @@ function renderOnboarding(md, renda) {
   });
 }
 
+/* 'nunca' = nunca respondeu; 'desatualizado' = já passou de 6 meses desde a
+   última resposta; null = tudo em dia. Perfil salvo antes desta feature não
+   tem `atualizadoEm` — não força revisão nesse caso (silencioso, só passa a
+   contar a partir da próxima vez que a pessoa responder). */
+function statusPerfil() {
+  const raw = localStorage.getItem('fin_perfil');
+  if (!raw) return 'nunca';
+  let fp;
+  try { fp = JSON.parse(raw); } catch { return 'nunca'; }
+  if (!fp.atualizadoEm) return null;
+  const dias = (Date.now() - new Date(fp.atualizadoEm).getTime()) / 86400000;
+  return dias > 182 ? 'desatualizado' : null;
+}
+
+/* Diferente do onboarding acima: aparece em QUALQUER mês (não só o vazio) e
+   não tem dispensa permanente — some sozinho assim que statusPerfil() volta
+   a ser null (perfil respondido/revisado), nunca por um clique de "fechar". */
+function renderLembretePerfil() {
+  const el = document.getElementById('perfil-lembrete');
+  if (!el) return;
+  const motivo = statusPerfil();
+  if (!motivo) { el.innerHTML = ''; return; }
+  const texto = motivo === 'nunca'
+    ? 'Você ainda não respondeu o questionário de perfil — ele sugere como dividir sua renda entre as categorias, do seu jeito.'
+    : 'Já faz mais de 6 meses desde a última vez que você revisou seu perfil financeiro. Vale a pena conferir se a divisão ainda faz sentido.';
+  el.innerHTML = `<div class="perfil-lembrete">
+    <span>${texto}</span>
+    <button class="perfil-lembrete-link" id="perfil-lembrete-link">${motivo === 'nunca' ? 'Responder questionário' : 'Revisar perfil'}</button>
+  </div>`;
+  document.getElementById('perfil-lembrete-link').addEventListener('click', () => {
+    document.querySelector('.nav-item[data-page="profile"]')?.click();
+  });
+}
+
 /* ══ CALCULADORA ══ */
 function renderCalc() {
   garantirParcelasDoMes(curMonth, curYear);
@@ -435,6 +519,7 @@ function renderCalc() {
   md.renda = String(renda); // campo legado: Período/Relatório continuam lendo daqui
   document.getElementById('renda-total').textContent = fmt(renda);
   renderOnboarding(md, renda);
+  renderLembretePerfil();
   renderRendas(md);
   renderMetrics(md, renda);
   renderCategories(md, renda);
@@ -2052,6 +2137,13 @@ curYear  = _now.getFullYear();
   document.getElementById('prev-month').disabled = false;
   document.getElementById('next-month').disabled = false;
   renderCalc();
+  // Só mostra o convite pra responder/revisar o Perfil UMA vez por sessão do
+  // navegador — sem isso, reapareceria a cada F5 pra quem já viu e pulou.
+  const motivoPerfil = statusPerfil();
+  if (motivoPerfil && !sessionStorage.getItem('fin_perfil_gate_shown')) {
+    abrirPerfilGate(motivoPerfil);
+    sessionStorage.setItem('fin_perfil_gate_shown', '1');
+  }
 });
 /* ══ SAÚDE FINANCEIRA (Fase D) ══ */
 /* Varre todo o histórico local e agrupa cada parcelamento (categoria +
@@ -2378,6 +2470,7 @@ function aplicarPerfil(resultado) {
     cats_pct: resultado.catsPct,
     risco: resultado.risco,
     respostas: resultado.respostas,
+    atualizadoEm: new Date().toISOString(),
   }));
   // Fase B3 + C: aplica o mix de investimento (horizonte x risco) só nas
   // classes conhecidas (renda_fixa/ações/fii/exterior) — uma classe extra
@@ -2454,6 +2547,10 @@ document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   const overlay = document.getElementById('confirm-overlay');
   if (overlay.classList.contains('open')) { document.getElementById('confirm-cancel').click(); return; }
+  const gate = document.getElementById('perfil-gate-overlay');
+  if (gate.classList.contains('open')) { document.getElementById('perfil-gate-pular').click(); return; }
+  const ajuda = document.getElementById('ajuda-overlay');
+  if (ajuda.classList.contains('open')) { document.getElementById('ajuda-fechar').click(); return; }
   const sidebar = document.getElementById('sidebar');
   if (sidebar?.classList.contains('open')) fecharMenuMobile();
 });
@@ -2461,6 +2558,57 @@ document.getElementById('confirm-logout').addEventListener('click', async () => 
   window._logoutIntencional = true; // ver aviso de sessão expirada no store.js
   await db.auth.signOut();
   window.location.href = 'index.html';
+});
+
+/* Convite pra responder/revisar o Perfil — abre no máximo uma vez por sessão
+   do navegador (fin_perfil_gate_shown em sessionStorage), pra não reaparecer
+   a cada clique de página. "Agora não" só fecha; quem decide se mostra de
+   novo na próxima visita é statusPerfil(). */
+function abrirPerfilGate(motivo) {
+  const textos = motivo === 'nunca'
+    ? {
+        titulo: 'Antes de começar',
+        texto: 'Leva menos de 1 minuto: responda um questionário rápido pra receber uma sugestão de como dividir sua renda entre as categorias, do seu jeito.',
+        botao: 'Responder agora',
+      }
+    : {
+        titulo: 'Hora de revisar?',
+        texto: 'Já faz mais de 6 meses desde a última vez que você revisou seu perfil financeiro. Sua vida pode ter mudado — vale a pena conferir se a divisão sugerida ainda faz sentido.',
+        botao: 'Revisar agora',
+      };
+  document.getElementById('perfil-gate-title').textContent = textos.titulo;
+  document.getElementById('perfil-gate-texto').textContent = textos.texto;
+  document.getElementById('perfil-gate-responder').textContent = textos.botao;
+  document.getElementById('perfil-gate-overlay').classList.add('open');
+  document.getElementById('perfil-gate-pular').focus();
+}
+document.getElementById('perfil-gate-pular').addEventListener('click', () => {
+  document.getElementById('perfil-gate-overlay').classList.remove('open');
+});
+document.getElementById('perfil-gate-overlay').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) document.getElementById('perfil-gate-pular').click();
+});
+document.getElementById('perfil-gate-responder').addEventListener('click', () => {
+  document.getElementById('perfil-gate-overlay').classList.remove('open');
+  document.querySelector('.nav-item[data-page="profile"]')?.click();
+});
+
+// Ajuda sob demanda: conteúdo troca conforme a página ativa no momento do clique.
+document.getElementById('btn-ajuda').addEventListener('click', () => {
+  const pg = document.querySelector('.nav-item.active')?.dataset.page;
+  const dados = AJUDA_TEXTOS[pg];
+  if (!dados) return;
+  document.getElementById('ajuda-titulo').textContent = dados.titulo;
+  document.getElementById('ajuda-conteudo').innerHTML = '<ul>' + dados.itens.map(i => `<li>${esc(i)}</li>`).join('') + '</ul>';
+  document.getElementById('ajuda-overlay').classList.add('open');
+  document.getElementById('ajuda-fechar').focus();
+});
+document.getElementById('ajuda-fechar').addEventListener('click', () => {
+  document.getElementById('ajuda-overlay').classList.remove('open');
+  document.getElementById('btn-ajuda').focus();
+});
+document.getElementById('ajuda-overlay').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) document.getElementById('ajuda-fechar').click();
 });
 
 // Carrega perfil ao abrir a aba

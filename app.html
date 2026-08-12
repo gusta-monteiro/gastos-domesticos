@@ -42,6 +42,7 @@
       <div class="topbar-left">
         <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Abrir menu"><i aria-hidden="true" class="ti ti-menu-2"></i></button>
         <span class="page-title" id="page-title">Calculadora</span>
+        <button class="theme-toggle" id="btn-ajuda" type="button" aria-label="Ajuda desta página" title="Ajuda"><i aria-hidden="true" class="ti ti-help-circle"></i></button>
         <div class="month-nav" id="month-nav">
           <button id="prev-month" aria-label="Mês anterior"><i aria-hidden="true" class="ti ti-chevron-left"></i></button>
           <span class="month-label" id="month-label"></span>
@@ -62,6 +63,7 @@
     <!-- Calculadora -->
     <div class="page active" id="page-calc">
       <div id="onboarding"></div>
+      <div id="perfil-lembrete"></div>
       <div class="metric-grid" id="metric-grid"></div>
       <div id="recorrentes-panel" style="display:none"></div>
       <div class="calc-grid">
@@ -440,6 +442,29 @@
     <div class="confirm-btns">
       <button class="btn" id="confirm-cancel">Cancelar</button>
       <button class="btn btn-logout" id="confirm-logout"><i aria-hidden="true" class="ti ti-logout"></i> Sair</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: convite pra responder/revisar o questionário de perfil -->
+<div class="confirm-overlay" id="perfil-gate-overlay" role="dialog" aria-modal="true" aria-labelledby="perfil-gate-title">
+  <div class="confirm-box">
+    <h3 id="perfil-gate-title"></h3>
+    <p id="perfil-gate-texto"></p>
+    <div class="confirm-btns">
+      <button class="btn" id="perfil-gate-pular">Agora não</button>
+      <button class="btn btn-primary" id="perfil-gate-responder">Responder agora</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: ajuda contextual da página atual -->
+<div class="confirm-overlay" id="ajuda-overlay" role="dialog" aria-modal="true" aria-labelledby="ajuda-titulo">
+  <div class="confirm-box confirm-box-wide">
+    <h3 id="ajuda-titulo"></h3>
+    <div id="ajuda-conteudo"></div>
+    <div class="confirm-btns">
+      <button class="btn" id="ajuda-fechar">Entendi</button>
     </div>
   </div>
 </div>

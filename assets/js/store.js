@@ -64,7 +64,7 @@
     // front e o back terminar) não pode derrubar a sincronização de meses e
     // classes, que são o que realmente importa pro app funcionar.
     const perfilPromise = db.from("user_profile")
-      .select("respostas, perfil_key, cats_pct, risco").eq("user_id", userId).maybeSingle()
+      .select("respostas, perfil_key, cats_pct, risco, updated_at").eq("user_id", userId).maybeSingle()
       .then((r) => r, (err) => ({ data: null, error: err }));
     const [{ data: months, error: e1 }, { data: classes, error: e2 }, { data: perfil, error: e3 }] = await Promise.all([
       db.from("budget_months").select("year, month, renda, payload").eq("user_id", userId),
@@ -112,6 +112,7 @@
       nativeSetItem(PERFIL_KEY, JSON.stringify({
         respostas: perfil.respostas || {}, perfilKey: perfil.perfil_key,
         cats_pct: perfil.cats_pct || {}, risco: perfil.risco,
+        atualizadoEm: perfil.updated_at || null,
       }));
     }
     return { monthCount: (months || []).length, classCount: (classes || []).length };

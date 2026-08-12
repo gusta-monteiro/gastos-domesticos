@@ -823,6 +823,27 @@
 .confirm-box h3 { font-size: 14px; font-weight: 500; margin-bottom: 0.5rem; }
 .confirm-box p { font-size: 12px; color: var(--text2); margin-bottom: 1.25rem; line-height: 1.6; }
 .confirm-btns { display: flex; gap: 8px; justify-content: flex-end; }
+/* Ajuda por página: texto mais longo que o do modal de logout, precisa de
+   mais respiro horizontal que os 340px padrão. */
+.confirm-box-wide { width: 440px; }
+.confirm-box-wide ul { padding-left: 1.1rem; margin-bottom: 1.25rem; }
+.confirm-box-wide li { font-size: 12px; color: var(--text2); line-height: 1.7; }
+
+/* Lembrete do Perfil: mesma ideia visual do aviso-mes-ref (borda âmbar de
+   atenção), mas fica na Calculadora inteira, não preso a um mês específico. */
+.perfil-lembrete {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  background: var(--bg); border: 0.5px solid var(--c-amber);
+  border-left-width: 3px; border-radius: var(--radius);
+  padding: 0.75rem 1rem; margin-bottom: 1.5rem;
+  font-size: 12px; color: var(--text2);
+}
+.perfil-lembrete-link {
+  background: none; border: 0.5px solid var(--c-amber); border-radius: var(--radius);
+  padding: 5px 12px; font-size: 12px; font-weight: 500; color: var(--c-amber);
+  cursor: pointer; font-family: 'Inter', sans-serif; flex-shrink: 0;
+}
+.perfil-lembrete-link:hover { background: var(--bg2); }
 
 @media (max-width: 900px) {
   .profile-grid { grid-template-columns: 1fr; }
