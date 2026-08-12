@@ -142,6 +142,28 @@
       <div class="report-card" id="report-content"></div>
 
       <div class="report-card">
+        <div class="report-section-title">Evolução do período</div>
+        <div class="period-grid">
+          <div>
+            <div class="period-chart-wrap"><canvas id="reportSaldoChart" role="img" aria-label="Gráfico de evolução de renda, gastos e saldo no período"></canvas></div>
+          </div>
+          <div>
+            <div class="period-chart-wrap"><canvas id="reportPatrimonioChart" role="img" aria-label="Gráfico de evolução do patrimônio investido no período"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="report-card">
+        <div class="report-section-title">Categorias: uso vs. meta</div>
+        <div class="period-chart-wrap" style="height:220px"><canvas id="reportCatChart" role="img" aria-label="Gráfico comparando valor alocado e valor lançado por categoria"></canvas></div>
+      </div>
+
+      <div class="report-card" id="report-parcelas-card" style="display:none">
+        <div class="report-section-title">Parcelamentos em aberto</div>
+        <div class="period-chart-wrap" style="height:220px"><canvas id="reportParcelasChart" role="img" aria-label="Gráfico dos parcelamentos em aberto por valor restante"></canvas></div>
+      </div>
+
+      <div class="report-card">
         <div class="ai-label"><i aria-hidden="true" class="ti ti-chart-dots"></i> Parecer do período</div>
         <div class="ai-box" id="ai-output">Selecione um período para visualizar o parecer.</div>
       </div>

@@ -16,6 +16,7 @@ const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','A
 let curMonth = new Date().getMonth();
 let curYear  = new Date().getFullYear();
 let pieChart = null, barChart = null, stackChart = null;
+let reportSaldoChart = null, reportPatrimonioChart = null, reportCatChart = null, reportParcelasChart = null;
 let pieRenda = 0; // renda do último render — o tooltip do gráfico lê daqui
 
 // Quem pediu "reduzir movimento" no sistema não deve ver a pizza re-animando
@@ -58,6 +59,7 @@ window.addEventListener('temamudou', () => {
   if (pagina === 'calc') renderCalc();
   else if (pagina === 'period') renderPeriod();
   else if (pagina === 'invest') renderInvest();
+  else if (pagina === 'report') renderReport();
 });
 
 /* ── Storage helpers ── */
@@ -1017,9 +1019,173 @@ function renderReport() {
 
   document.getElementById('report-content').innerHTML = html;
   gerarParecer(months);
+  renderReportSaldoChart(data);
+  renderReportCategoriaChart(data);
+  renderReportParcelasChart();
+  renderReportPatrimonioChart(months); // async: substitui os números chapados pelos reais ao chegar
 }
 
 document.getElementById('report-period').addEventListener('change', renderReport);
+
+/* Renda, gastos e saldo mês a mês — a mesma soma da tabela "Resumo mensal"
+   acima, só que em linha pra enxergar tendência de longo prazo de relance. */
+function renderReportSaldoChart(data) {
+  const labels = data.map(d => d.label);
+  const rendas = data.map(({md}) => parseFloat(md.renda)||0);
+  const gastos = data.map(({md}) => md.cats.reduce((s, c) => s + c.items.reduce((ss, it) => ss + (parseFloat(it.value)||0), 0), 0));
+  const saldos = rendas.map((r, i) => r - gastos[i]);
+
+  const eixoDinheiro = v => v >= 1000
+    ? 'R$ ' + (v/1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' mil'
+    : 'R$ ' + v.toLocaleString('pt-BR');
+  const legenda = { display: true, position: 'bottom', labels: { font: { family: 'Inter', size: 11 }, color: corTextoGrafico(), boxWidth: 10, boxHeight: 10 } };
+
+  if (reportSaldoChart) reportSaldoChart.destroy();
+  reportSaldoChart = new Chart(document.getElementById('reportSaldoChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Renda', data: rendas, borderColor: corTema('#2c2c2a'), backgroundColor: 'transparent', tension: 0.25, pointRadius: 3 },
+        { label: 'Gastos', data: gastos, borderColor: '#B4B2A9', backgroundColor: 'transparent', tension: 0.25, pointRadius: 3 },
+        { label: 'Saldo', data: saldos, borderColor: corTema('#1a7a4a'), backgroundColor: 'transparent', tension: 0.25, pointRadius: 3, borderDash: [4, 3] },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: legenda, tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmt(ctx.raw)}` } } },
+      scales: {
+        x: { ticks: { font: { family: 'Inter', size: 11 }, color: corTextoGrafico(), maxRotation: 0 }, grid: { display: false } },
+        y: { ticks: { font: { family: 'Inter', size: 11 }, color: corTextoGrafico(), callback: eixoDinheiro }, grid: { color: corGradeGrafico() } }
+      }
+    }
+  });
+}
+
+/* Alocado (meta da categoria) x lançado (real) somados no período — mesma
+   conta do parecer ("Categorias vs. metas"), só que em gráfico. */
+function renderReportCategoriaChart(data) {
+  const catAgg = CATS.map((def, ci) => {
+    let alocado = 0, lancado = 0;
+    data.forEach(({md}) => {
+      const renda = parseFloat(md.renda)||0;
+      const cat = md.cats[ci];
+      if (!cat) return;
+      alocado += renda * (parseFloat(cat.pct)||0) / 100;
+      lancado += cat.items.reduce((s, it) => s + (parseFloat(it.value)||0), 0);
+    });
+    return { label: def.label, alocado, lancado };
+  }).filter(c => c.alocado > 0 || c.lancado > 0);
+
+  const legenda = { display: true, position: 'bottom', labels: { font: { family: 'Inter', size: 11 }, color: corTextoGrafico(), boxWidth: 10, boxHeight: 10 } };
+
+  if (reportCatChart) reportCatChart.destroy();
+  reportCatChart = new Chart(document.getElementById('reportCatChart'), {
+    type: 'bar',
+    data: {
+      labels: catAgg.map(c => c.label),
+      datasets: [
+        { label: 'Alocado (meta)', data: catAgg.map(c => c.alocado), backgroundColor: corTema('#B4B2A9'), borderColor: corBordaSegmento(), borderWidth: estaEscuro() ? 1 : 0 },
+        { label: 'Lançado (real)', data: catAgg.map(c => c.lancado), backgroundColor: corTema('#2c2c2a'), borderColor: corBordaSegmento(), borderWidth: estaEscuro() ? 1 : 0 },
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: legenda, tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmt(ctx.raw)}` } } },
+      scales: {
+        x: { ticks: { font: { family: 'Inter', size: 11 }, color: corTextoGrafico() }, grid: { color: corGradeGrafico() } },
+        y: { ticks: { font: { family: 'Inter', size: 11 }, color: corTextoGrafico() }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+/* Parcelamentos em aberto (Fase A/D) — quanto ainda falta pagar de cada
+   série, do maior pro menor. É um retrato de hoje (não depende do período
+   escolhido acima), igual ao card de Saúde Financeira da Calculadora. */
+function renderReportParcelasChart() {
+  const card = document.getElementById('report-parcelas-card');
+  const saude = calcularSaudeFinanceira();
+  if (saude.quitado) { card.style.display = 'none'; return; }
+  card.style.display = '';
+
+  const top = saude.ativos.slice(0, 8);
+  if (reportParcelasChart) reportParcelasChart.destroy();
+  reportParcelasChart = new Chart(document.getElementById('reportParcelasChart'), {
+    type: 'bar',
+    data: {
+      labels: top.map(a => a.nome),
+      datasets: [{ label: 'Valor restante', data: top.map(a => a.valorRestante), backgroundColor: corTema('#c0392b'), borderColor: corBordaSegmento(), borderWidth: estaEscuro() ? 1 : 0 }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: {
+        label: ctx => `${fmt(ctx.raw)} restante`,
+        afterLabel: ctx => `Parcela ${top[ctx.dataIndex].atual}/${top[ctx.dataIndex].total}`,
+      } } },
+      scales: {
+        x: { ticks: { font: { family: 'Inter', size: 11 }, color: corTextoGrafico() }, grid: { color: corGradeGrafico() } },
+        y: { ticks: { font: { family: 'Inter', size: 11 }, color: corTextoGrafico() }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+/* Patrimônio total investido (Independência + Meta) mês a mês, com juros
+   já aplicados — chapado (soma simples dos aportes) até a resposta da
+   nuvem chegar, depois substituído pelo real, igual ao padrão já usado em
+   Investimentos (aplicarPatrimonioReal). */
+let reportPatrimonioSeq = 0; // trava contra resposta assíncrona desatualizada (período trocado no meio do fetch)
+async function renderReportPatrimonioChart(months) {
+  const meuSeq = ++reportPatrimonioSeq;
+  const eixoDinheiro = v => v >= 1000
+    ? 'R$ ' + (v/1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' mil'
+    : 'R$ ' + v.toLocaleString('pt-BR');
+  const desenhar = valores => {
+    if (meuSeq !== reportPatrimonioSeq) return; // resposta antiga, período já mudou
+    if (reportPatrimonioChart) reportPatrimonioChart.destroy();
+    reportPatrimonioChart = new Chart(document.getElementById('reportPatrimonioChart'), {
+      type: 'line',
+      data: {
+        labels: months.map(({m, y}) => MONTHS[m].slice(0,3) + '/' + String(y).slice(2)),
+        datasets: [{ label: 'Patrimônio investido', data: valores, borderColor: corTema('#1a7a4a'), backgroundColor: 'transparent', tension: 0.25, pointRadius: 3, fill: false }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `Patrimônio: ${fmt(ctx.raw)}` } } },
+        scales: {
+          x: { ticks: { font: { family: 'Inter', size: 11 }, color: corTextoGrafico(), maxRotation: 0 }, grid: { display: false } },
+          y: { ticks: { font: { family: 'Inter', size: 11 }, color: corTextoGrafico(), callback: eixoDinheiro }, grid: { color: corGradeGrafico() } }
+        }
+      }
+    });
+  };
+
+  // Chapado: soma acumulada dos aportes lançados dentro da janela do período
+  // (mesma aproximação de renderInvHistory — sem juros, sem histórico anterior
+  // à janela; o real substitui em seguida com o cálculo completo).
+  let acum = 0;
+  desenhar(months.map(({m, y}) => {
+    const { indep, meta, emerg } = getInvLancados(m, y);
+    acum += indep + meta + emerg;
+    return acum;
+  }));
+
+  if (!window.store || !window.store.buscarLedgerCompleto) return;
+  const [indepEvol, metaEvol] = await Promise.all([
+    carregarEvolucaoInvestimentos('independencia'),
+    carregarEvolucaoInvestimentos('meta'),
+  ]);
+  if (!indepEvol && !metaEvol) return;
+  desenhar(months.map(({m, y}) => {
+    const key = `${y}-${m + 1}`;
+    const pIndep = indepEvol && indepEvol.porMes.get(key);
+    const pMeta = metaEvol && metaEvol.porMes.get(key);
+    return (pIndep ? pIndep.patrimonio : 0) + (pMeta ? pMeta.patrimonio : 0);
+  }));
+}
 
 /* ══ PARECER AUTOMÁTICO ══ */
 function gerarParecer(months) {
