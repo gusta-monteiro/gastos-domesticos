@@ -787,8 +787,19 @@ function renderCategories(md, renda) {
       if (e.target.value.trim() === '') return; // deixa terminar de digitar
       it.parcela[campo] = Math.max(1, parseInt(e.target.value) || 1);
       saveMonth(curMonth, curYear, md);
-      const badge = e.target.closest('.item-block')?.querySelector('.item-parcela-badge');
+      const bloco = e.target.closest('.item-block');
+      const badge = bloco?.querySelector('.item-parcela-badge');
       if (badge) badge.textContent = `${it.parcela.atual}/${it.parcela.total}`;
+      // "5 de 3" não é erro de digitação (a lib não impede), mas quita a
+      // série sem avisar — sinaliza os dois campos em vez de aceitar calado.
+      const invalido = it.parcela.atual > it.parcela.total;
+      const inpAtual = bloco?.querySelector('.item-parcela-atual');
+      const inpTotal = bloco?.querySelector('.item-parcela-total');
+      inpAtual?.classList.toggle('campo-invalido', invalido);
+      inpTotal?.classList.toggle('campo-invalido', invalido);
+      const title = invalido ? 'A parcela atual não pode ser maior que o total — essa série vai aparecer como quitada.' : '';
+      if (inpAtual) inpAtual.title = title;
+      if (inpTotal) inpTotal.title = title;
     };
     div.querySelectorAll('.item-parcela-atual').forEach(inp => {
       inp.addEventListener('input', e => atualizarParcela(e, 'atual'));
@@ -1305,13 +1316,14 @@ function gerarParecer(months) {
   let linhas = [];
 
   /* Diagnóstico geral */
+  const taxaMediaFmt = taxaMedia.toFixed(1).replace('.', ','); // "82.3" -> "82,3" (decimal BR)
   linhas.push('── Diagnóstico geral ──────────────────');
   if (taxaMedia <= 75) {
-    linhas.push(`✔ Taxa média de gasto em ${taxaMedia.toFixed(1)}% da renda — dentro de um patamar saudável.`);
+    linhas.push(`✔ Taxa média de gasto em ${taxaMediaFmt}% da renda — dentro de um patamar saudável.`);
   } else if (taxaMedia <= 90) {
-    linhas.push(`⚠ Taxa média de gasto em ${taxaMedia.toFixed(1)}% da renda — atenção, margem de segurança reduzida.`);
+    linhas.push(`⚠ Taxa média de gasto em ${taxaMediaFmt}% da renda — atenção, margem de segurança reduzida.`);
   } else {
-    linhas.push(`✘ Taxa média de gasto em ${taxaMedia.toFixed(1)}% da renda — comprometimento elevado, revisar categorias.`);
+    linhas.push(`✘ Taxa média de gasto em ${taxaMediaFmt}% da renda — comprometimento elevado, revisar categorias.`);
   }
 
   if (mesesNegativo > 0) {
@@ -1475,7 +1487,14 @@ async function carregarEvolucaoInvestimentos(portfolio) {
 /* Substitui os números chapados pelos reais assim que o cálculo chega —
    nunca bloqueia o primeiro render, só atualiza por cima. */
 function aplicarPatrimonioReal(dados, todasClasses, classes, reserva, acumEmerg) {
-  if (!dados) return;
+  if (!dados) {
+    // null = "sem classe ou sem ledger ainda" — sem isso, "calculando
+    // rendimento..." ficava piscando pra sempre numa conta que nunca lançou
+    // nenhum aporte, como se o cálculo estivesse travado.
+    const subEl = document.getElementById('inv-patrimonio-sub');
+    if (subEl && subEl.textContent === 'calculando rendimento...') subEl.textContent = 'sem aportes registrados ainda';
+    return;
+  }
   const { porClasse, porMes } = dados;
 
   let patrimonioTotalVal = 0, aportadoTotal = 0, temSaldoReal = false;

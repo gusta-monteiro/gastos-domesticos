@@ -71,7 +71,14 @@ document.getElementById("btn-login").addEventListener("click", async () => {
   if (error) {
     btn.disabled = false;
     btn.textContent = "Entrar";
-    showMsg("msg-login", "error", "E-mail ou senha incorretos.");
+    // Mensagem do Supabase pra e-mail não confirmado é bem diferente de
+    // senha errada — mostrar "senha incorreta" aqui manda a pessoa tentar
+    // redefinir a senha à toa, quando o problema real é nunca ter clicado
+    // no link de confirmação que chegou por e-mail.
+    const msg = /email not confirmed/i.test(error.message)
+      ? "Você ainda não confirmou seu e-mail. Confira sua caixa de entrada (e o spam) e clique no link de confirmação."
+      : "E-mail ou senha incorretos.";
+    showMsg("msg-login", "error", msg);
     return;
   }
 
