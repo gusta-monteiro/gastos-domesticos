@@ -2306,7 +2306,7 @@ document.getElementById('btn-save-profile').addEventListener('click', async () =
   btn.textContent = 'Salvar alterações';
 
   if (error) {
-    showProfileMsg('profile-msg', 'error', 'Erro ao salvar: ' + error.message);
+    showProfileMsg('profile-msg', 'error', 'Erro ao salvar: ' + traduzirErroSupabase(error));
     return;
   }
 
@@ -2342,7 +2342,7 @@ document.getElementById('btn-save-password').addEventListener('click', async () 
   btn.textContent = 'Alterar senha';
 
   if (error) {
-    showProfileMsg('password-msg', 'error', 'Erro: ' + error.message);
+    showProfileMsg('password-msg', 'error', 'Erro: ' + traduzirErroSupabase(error));
     return;
   }
 

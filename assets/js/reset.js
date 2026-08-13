@@ -88,7 +88,7 @@ document.getElementById("btn-reset").addEventListener("click", async () => {
   if (error) {
     btn.disabled = false;
     btn.textContent = "Salvar nova senha";
-    showMsg("error", "Não foi possível salvar: " + error.message);
+    showMsg("error", "Não foi possível salvar: " + traduzirErroSupabase(error));
     return;
   }
 

@@ -119,7 +119,7 @@ document.getElementById("btn-signup").addEventListener("click", async () => {
   if (error) {
     btn.disabled = false;
     btn.textContent = "Criar conta";
-    showMsg("msg-signup", "error", "Erro ao criar conta: " + error.message);
+    showMsg("msg-signup", "error", "Erro ao criar conta: " + traduzirErroSupabase(error));
     return;
   }
 
