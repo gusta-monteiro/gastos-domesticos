@@ -2315,7 +2315,12 @@ document.getElementById('btn-save-profile').addEventListener('click', async () =
 });
 
 // Alterar senha
-document.getElementById('btn-save-password').addEventListener('click', async () => {
+document.getElementById('password-form').addEventListener('submit', async (e) => {
+  // <form> de verdade (não só um <div>) é o que faz o gerenciador de senha
+  // do navegador reconhecer isto como uma troca de senha e oferecer salvar
+  // a nova — sem isso, alguns navegadores nunca ofereciam atualizar a senha
+  // salva.
+  e.preventDefault();
   const newPass     = document.getElementById('profile-new-password').value;
   const confirmPass = document.getElementById('profile-confirm-password').value;
 
@@ -2484,6 +2489,13 @@ function renderPerfilResultado(resultado) {
 }
 
 function aplicarPerfil(resultado) {
+  // Snapshot de tudo que vai mudar, pra poder desfazer — o painel acima já
+  // mostra as % antes do clique, então um modal de confirmação seria mais
+  // um passo pra clicar sem ganhar segurança real; reversível (como o resto
+  // do app trata edição/remoção) é mais consistente que travar com um "tem
+  // certeza?".
+  const perfilAntes = localStorage.getItem('fin_perfil');
+
   localStorage.setItem('fin_perfil', JSON.stringify({
     perfilKey: resultado.perfilKey,
     cats_pct: resultado.catsPct,
@@ -2503,6 +2515,7 @@ function aplicarPerfil(resultado) {
   // passado que existe em cats_pct.
   const ehPerfilMeta = resultado.perfilKey === 'objetivo_meta';
   const todasClasses = ehPerfilMeta ? loadInvClassesMeta() : loadInvClasses();
+  const pctClassesAntes = new Map(todasClasses.map(c => [c.key, c.pct]));
   let mudouClasses = false;
   todasClasses.forEach((c) => {
     const novoPct = resultado.mixInvestimento[c.key];
@@ -2523,8 +2536,10 @@ function aplicarPerfil(resultado) {
   // nascem com o perfil via pctPadrao(); meses passados nunca são tocados.
   const hoje = new Date();
   const mHoje = hoje.getMonth(), yHoje = hoje.getFullYear();
+  let pctMesAntes = null;
   if (localStorage.getItem('fin_' + mKey(mHoje, yHoje))) {
     const md = loadMonth(mHoje, yHoje);
+    pctMesAntes = new Map(md.cats.map(c => [c.key, c.pct]));
     md.cats.forEach(c => {
       if (typeof resultado.catsPct[c.key] === 'number') c.pct = resultado.catsPct[c.key];
     });
@@ -2532,6 +2547,24 @@ function aplicarPerfil(resultado) {
     if (curMonth === mHoje && curYear === yHoje) renderCalc();
   }
   showProfileMsg('perfil-msg', 'success', 'Perfil aplicado! A partir de hoje, os meses e o mix de investimento vão usar essas porcentagens.');
+
+  oferecerDesfazer('Perfil aplicado', () => {
+    if (perfilAntes) localStorage.setItem('fin_perfil', perfilAntes);
+    else localStorage.removeItem('fin_perfil');
+    if (mudouClasses) {
+      todasClasses.forEach(c => { if (pctClassesAntes.has(c.key)) c.pct = pctClassesAntes.get(c.key); });
+      if (ehPerfilMeta) saveInvClassesMeta(todasClasses);
+      else saveInvClasses(todasClasses);
+    }
+    if (pctMesAntes) {
+      const md = loadMonth(mHoje, yHoje);
+      md.cats.forEach(c => { if (pctMesAntes.has(c.key)) c.pct = pctMesAntes.get(c.key); });
+      saveMonth(mHoje, yHoje, md);
+      if (curMonth === mHoje && curYear === yHoje) renderCalc();
+    }
+    initPerfilForm();
+    showProfileMsg('perfil-msg', 'success', 'Perfil anterior restaurado.');
+  });
 }
 
 document.getElementById('btn-calcular-perfil').addEventListener('click', () => {
